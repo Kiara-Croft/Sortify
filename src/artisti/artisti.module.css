@@ -1,0 +1,79 @@
+.container {
+  background-color: #000;
+  color: #1ed760;
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  padding: clamp(10px, 2vw, 20px);
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: clamp(20px, 5vh, 50px);
+}
+
+.logoContainer {
+  width: clamp(24px, 3vw, 40px);
+  height: clamp(24px, 3vw, 40px);
+  margin-right: clamp(5px, 1vw, 15px);
+  flex-shrink: 0; /* nu se micșorează aiurea */
+}
+
+.logo {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+.title {
+  font-size: clamp(16px, 2vw, 24px);
+  font-weight: bold;
+  color: #1ed760;
+  margin: 0;
+}
+
+.mainHeading {
+  font-size: clamp(20px, 3vw, 36px);
+  text-align: center;
+  margin-bottom: clamp(20px, 5vh, 40px);
+  color: #1ed760;
+}
+
+.tableContainer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: auto 1fr;
+  border-top: 2px solid #1ed760;
+  border-left: 2px solid #1ed760;
+  border-right: 2px solid #1ed760;
+  min-height: clamp(300px, 50vh, 600px);
+  overflow-x: auto; /* dacă ecranul e mic, face scroll orizontal */
+}
+
+.tableHeader {
+  background-color: #000;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  padding: clamp(8px, 1.5vh, 15px);
+  border-bottom: 2px solid #1ed760;
+  border-right: 2px solid #1ed760;
+  margin-bottom: -2px;
+  font-size: clamp(12px, 1.5vw, 16px);
+}
+
+.tableHeader:last-child {
+  border-right: none;
+}
+
+.tableContentCell {
+  border-right: 2px solid #1ed760;
+  padding: clamp(6px, 1vh, 12px);
+  font-size: clamp(12px, 1.5vw, 16px);
+}
+
+.tableContentCell:last-child {
+  border-right: none;
+}

@@ -1,0 +1,66 @@
+:root {
+  --primary-color: #1ed760; /* A green color for headings and lines */
+  --text-color: #e0f2e0; /* A light green color for text */
+  --bg-color: #000000; /* Dark background color */
+}
+
+.container {
+  background-color: var(--bg-color);
+  min-height: 100vh;
+  color: var(--text-color);
+  font-family: Arial, sans-serif;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+  padding: 0 20px;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 30px; /* Adjust as needed */
+  margin-right: 10px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+.mainTitle {
+  text-align: center;
+  font-size: 2rem;
+  color: var(--primary-color);
+  margin-bottom: 50px;
+}
+
+.tableContainer {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tableHeader {
+  display: flex;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.column {
+  flex: 1;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
