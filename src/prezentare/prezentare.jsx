@@ -12,9 +12,9 @@ export function Prezentare() {
     "playlist-modify-public",
   ];
 
-  const loginUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes.join(
-    "%20"
-  )}&response_type=code&show_dialog=true`;
+  const loginUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    redirectUri
+  )}&scope=${scopes.join("%20")}&response_type=code&show_dialog=true`;
 
   return (
     <div className={styles.container}>
