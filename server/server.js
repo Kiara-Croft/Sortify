@@ -10,6 +10,13 @@ app.use(express.json());
 app.post("/get-token", async (req, res) => {
   const { code, redirect_uri } = req.body;
 
+  // LOG aici, după ce ai extras din req.body!
+  console.log("Requesting token with:");
+  console.log("client_id:", process.env.SPOTIFY_CLIENT_ID);
+  console.log("client_secret:", process.env.SPOTIFY_CLIENT_SECRET);
+  console.log("code:", code);
+  console.log("redirect_uri:", redirect_uri);
+
   try {
     const params = new URLSearchParams();
     params.append("grant_type", "authorization_code");
@@ -35,7 +42,11 @@ app.post("/get-token", async (req, res) => {
 
     res.json(response.data); // va conține access_token, refresh_token, expires_in
   } catch (err) {
-    console.error(err.response.data);
+    if (err.response) {
+      console.error("Spotify response error:", err.response.data);
+    } else {
+      console.error("Other error:", err.message);
+    }
     res.status(400).json({ error: "Nu s-a putut obține token-ul" });
   }
 });
