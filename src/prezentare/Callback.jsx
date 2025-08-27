@@ -11,9 +11,9 @@ export function Callback() {
 
     if (code) {
       console.log("Code primit de la Spotify:", code);
-      // Trimite codul la backend pentru a obține token-ul
-      fetch(`${RENDER_BACKEND_URL}/get-token`, {
-        // AICI AM CORECTAT URL-UL
+
+      // 👇 1. CORECTEAZĂ URL-UL CU ENDPOINT-UL CORECT
+      fetch("https://sortify-zucb.onrender.com/get-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -21,51 +21,44 @@ export function Callback() {
           redirect_uri: "https://melody-lab.netlify.app/callback",
         }),
       })
+        // 👇 2. ADAUGĂ VERIFICAREA PENTRU ERORI
         .then((res) => {
           if (!res.ok) {
-            // Dacă backend-ul răspunde cu eroare, aruncă o eroare
-            return res.json().then((err) => {
-              console.error("Eroare de la backend:", err);
-              throw new Error(
-                err.error || `Codul de stare HTTP nu a fost OK: ${res.status}`
-              );
-            });
+            // Dacă răspunsul de la server este o eroare (4xx, 5xx)
+            throw new Error(`Eroare de la server: ${res.status}`);
           }
           return res.json();
         })
         .then((data) => {
-          console.log("Token primit:", data);
+          // 3. SALVEAZĂ TOKEN-URILE (și refresh token, dacă este cazul)
           localStorage.setItem("spotifyAccessToken", data.access_token);
-          localStorage.setItem("spotifyRefreshToken", data.refresh_token);
-          navigate("/artisti");
+          // Dacă backend-ul întoarce și un refresh_token, salvează-l și pe acela
+          if (data.refresh_token) {
+            localStorage.setItem("spotifyRefreshToken", data.refresh_token);
+          }
+          console.log("Token salvat cu succes!");
+          navigate("/artisti"); // Navighează către pagina principală
         })
         .catch((err) => {
+          // 4. GESTIONEAZĂ ERORILE MAI BINE
           console.error("Eroare la obținerea token-ului:", err);
-          // Navighează la o pagină de eroare
+          // Navighează într-o pagină de eroare sau afișează un mesaj
           navigate("/error", {
-            state: {
-              message:
-                "Eroare la obținerea token-ului de la backend. Verifică consola pentru detalii.",
-            },
+            state: { message: "Conectarea la Spotify a eșuat." },
           });
         });
     } else {
-      console.log(
-        "Eroare la autentificare sau utilizatorul a refuzat permisiunile."
-      );
+      // 5. GESTIONEAZĂ CAZUL CÂND NU EXISTĂ COD ÎN URL
+      console.error("Eroare: Nu s-a primit codul de la Spotify.");
       navigate("/error", {
-        state: {
-          message:
-            "Conectarea a eșuat. Utilizatorul a refuzat permisiunile sau a apărut o eroare.",
-        },
+        state: { message: "Nu s-a primit aprobarea de la Spotify." },
       });
     }
-  }, [location, navigate]);
+  }, [location, navigate]); // 👈 6. ADAUGĂ location și navigate ca dependencies
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500 mb-4"></div>
-      <p className="text-xl">Se încarcă. Te rugăm să aștepți...</p>
+    <div className="flex justify-center items-center min-h-screen">
+      <p>Se încarcă...</p>
     </div>
   );
 }
