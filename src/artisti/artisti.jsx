@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./artisti.module.css";
 
+// CONFIGURARE SPOTIFY
+const SPOTIFY_CLIENT_ID = "5c850d0891ff424abb1f7816057eee8f";
+const SPOTIFY_REDIRECT_URI = "https://melody-lab.netlify.app/callback";
+const SPOTIFY_SCOPES = [
+  "playlist-read-private",
+  "playlist-read-collaborative",
+  "user-read-private",
+  "user-read-email",
+].join("%20");
+
 export function Artisti() {
   const navigate = useNavigate();
   const [accessToken, setAccessToken] = useState(
@@ -11,9 +21,10 @@ export function Artisti() {
   const [sortedTracks, setSortedTracks] = useState(null);
   const [expandedArtist, setExpandedArtist] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [artistDetails, setArtistDetails] = useState({});
+  const [progress, setProgress] = useState(0);
+  const [totalTracks, setTotalTracks] = useState(0);
 
-  // Categorii predefinite
+  // Categorii EXACT cum le-am definit
   const categories = {
     female: "Fete",
     male: "Baieti",
@@ -24,17 +35,96 @@ export function Artisti() {
     unsorted: "Artisti cu o piesa in playlist",
   };
 
-  // Verifică dacă avem token de acces
+  // Verifică token și autentificare
   useEffect(() => {
-    if (!accessToken) {
+    const hash = window.location.hash;
+    let token = localStorage.getItem("spotifyAccessToken");
+
+    if (!token && hash) {
+      token = hash
+        .substring(1)
+        .split("&")
+        .find((elem) => elem.startsWith("access_token"))
+        .split("=")[1];
+
+      if (token) {
+        localStorage.setItem("spotifyAccessToken", token);
+        setAccessToken(token);
+        window.location.hash = "";
+      }
+    }
+
+    if (!token) {
       navigate("/");
+    } else if (!accessToken) {
+      setAccessToken(token);
     }
   }, [accessToken, navigate]);
 
-  // Funcție pentru a obține detalii despre artist de la Spotify
-  const fetchArtistDetails = async (artistId) => {
-    if (!accessToken || artistDetails[artistId]) return;
+  // Funcție pentru autentificare Spotify
+  const handleLogin = () => {
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(
+      SPOTIFY_REDIRECT_URI
+    )}&scope=${SPOTIFY_SCOPES}&response_type=token&show_dialog=true`;
+    window.location.href = authUrl;
+  };
 
+  // Funcție pentru a obține toate melodiile din playlist
+  const fetchAllPlaylistTracks = async (playlistId) => {
+    let allTracks = [];
+    let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
+    let fetched = 0;
+    let total = 0;
+
+    // Mai întâi obține numărul total de piese
+    const initialResponse = await fetch(
+      `https://api.spotify.com/v1/playlists/${playlistId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (initialResponse.ok) {
+      const playlistData = await initialResponse.json();
+      total = playlistData.tracks.total;
+      setTotalTracks(total);
+    }
+
+    while (nextUrl) {
+      const response = await fetch(nextUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem("spotifyAccessToken");
+          setAccessToken("");
+          navigate("/");
+          return [];
+        }
+        throw new Error("Failed to fetch playlist tracks");
+      }
+
+      const data = await response.json();
+      allTracks = [...allTracks, ...data.items];
+      fetched += data.items.length;
+
+      // Actualizează progresul cu numărul real de piese
+      setProgress(Math.min(100, Math.round((fetched / total) * 100)));
+      nextUrl = data.next;
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    return allTracks;
+  };
+
+  // Funcție pentru a obține detalii despre artist
+  const fetchArtistDetails = async (artistId) => {
     try {
       const response = await fetch(
         `https://api.spotify.com/v1/artists/${artistId}`,
@@ -46,235 +136,200 @@ export function Artisti() {
       );
 
       if (response.ok) {
-        const data = await response.json();
-        setArtistDetails((prev) => ({ ...prev, [artistId]: data }));
+        return await response.json();
       }
     } catch (error) {
-      console.error("Error fetching artist details:", error);
+      console.error("Error fetching artist:", error);
     }
+    return null;
   };
 
-  // Funcție pentru a obține playlistul de pe Spotify
+  // Funcție pentru a determina categoria artistului (FĂRĂ ARTISTI HARCODATI)
+  const determineArtistCategory = (artistName, genres, trackCount) => {
+    const name = artistName.toLowerCase();
+
+    // 1. Verifică DJ (prioritate maximă)
+    if (name.includes("dj ") || name.startsWith("dj") || name.endsWith("dj")) {
+      return "dj";
+    }
+
+    // 2. Verifică Rap/Trap (prioritate high)
+    if (genres && genres.length > 0) {
+      const genreStr = genres.join(" ").toLowerCase();
+      if (
+        genreStr.includes("rap") ||
+        genreStr.includes("hip hop") ||
+        genreStr.includes("trap") ||
+        genreStr.includes("drill")
+      ) {
+        return "rapper";
+      }
+    }
+
+    // 3. Verifică Trupe/Grupuri
+    if (
+      name.includes("&") ||
+      name.includes(" and ") ||
+      name.includes(" vs ") ||
+      name.includes(" x ") ||
+      name.includes("+") ||
+      name.includes(",") ||
+      name.includes("band") ||
+      name.includes("crew") ||
+      name.includes("collective") ||
+      name.includes("project") ||
+      name.includes("group") ||
+      name.includes("trupa")
+    ) {
+      return "band";
+    }
+
+    // 4. Verifică Coloana Sonoră
+    if (
+      name.includes("soundtrack") ||
+      name.includes("score") ||
+      name.includes("original") ||
+      name.includes("motion picture")
+    ) {
+      return "soundtrack";
+    }
+
+    // 5. Verifică artiști cu o singură piesă
+    if (trackCount === 1) {
+      return "unsorted";
+    }
+
+    // 6. Folosește genurile Spotify pentru a determina genul artistului
+    if (genres && genres.length > 0) {
+      const genreStr = genres.join(" ").toLowerCase();
+
+      // Genuri care indică artiști feminini
+      if (
+        genreStr.includes("pop") ||
+        genreStr.includes("r&b") ||
+        genreStr.includes("soul") ||
+        genreStr.includes("latin") ||
+        genreStr.includes("dance pop") ||
+        genreStr.includes("electropop")
+      ) {
+        return "female";
+      }
+
+      // Genuri care indică artiști masculini
+      if (
+        genreStr.includes("rock") ||
+        genreStr.includes("metal") ||
+        genreStr.includes("indie") ||
+        genreStr.includes("alternative") ||
+        genreStr.includes("edm") ||
+        genreStr.includes("electronic")
+      ) {
+        return "male";
+      }
+    }
+
+    // 7. Dacă nu se poate determina, folosește "male" ca default
+    return "male";
+  };
+
+  // Funcție pentru a obține playlist-ul
   const fetchPlaylist = async () => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      handleLogin();
+      return;
+    }
 
     setIsLoading(true);
+    setProgress(0);
+    setTotalTracks(0);
+
     try {
       const playlistId = "3aUY5hCQoliumlMGmFB3E4";
-      const response = await fetch(
-        `https://api.spotify.com/v1/playlists/${playlistId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const allTracks = await fetchAllPlaylistTracks(playlistId);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch playlist");
+      if (allTracks.length === 0) {
+        throw new Error("Nu s-au putut obține melodiile din playlist");
       }
 
-      const data = await response.json();
-      setPlaylist(data);
+      // Procesează melodiile
+      const sorted = {
+        female: {},
+        male: {},
+        dj: {},
+        rapper: {},
+        band: {},
+        soundtrack: {},
+        unsorted: {},
+      };
 
-      // Obține toate melodiile (paginate)
-      let allTracks = [...data.tracks.items];
-      if (data.tracks.next) {
-        let nextUrl = data.tracks.next;
-        while (nextUrl) {
-          const nextResponse = await fetch(nextUrl, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
+      const artistCache = {};
 
-          if (nextResponse.ok) {
-            const nextData = await nextResponse.json();
-            allTracks = [...allTracks, ...nextData.items];
-            nextUrl = nextData.next;
-          } else {
-            nextUrl = null;
-          }
+      // Contorizează piese per artist
+      const artistTrackCount = {};
+      allTracks.forEach((item) => {
+        if (item.track && item.track.artists && item.track.artists.length > 0) {
+          const artistId = item.track.artists[0].id;
+          artistTrackCount[artistId] = (artistTrackCount[artistId] || 0) + 1;
         }
+      });
+
+      // Procesează fiecare melodie
+      for (let i = 0; i < allTracks.length; i++) {
+        const item = allTracks[i];
+        setProgress(Math.round((i / allTracks.length) * 100));
+
+        if (
+          !item.track ||
+          !item.track.artists ||
+          item.track.artists.length === 0
+        )
+          continue;
+
+        const track = item.track;
+        const artist = track.artists[0];
+        const artistId = artist.id;
+        const trackCount = artistTrackCount[artistId] || 0;
+
+        // Obține detalii artist de la Spotify
+        if (!artistCache[artistId]) {
+          artistCache[artistId] = await fetchArtistDetails(artistId);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+
+        const artistDetails = artistCache[artistId];
+        const genres = artistDetails ? artistDetails.genres : [];
+
+        // Determină categoria folosind DOAR datele de la Spotify
+        let category = determineArtistCategory(artist.name, genres, trackCount);
+
+        if (!sorted[category][artistId]) {
+          sorted[category][artistId] = {
+            artist: artist,
+            tracks: [],
+          };
+        }
+
+        sorted[category][artistId].tracks.push(track);
       }
 
-      sortTracks(allTracks);
+      // Sortează artiștii alfabetic
+      Object.keys(sorted).forEach((category) => {
+        const artistsArray = Object.values(sorted[category]);
+        artistsArray.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
+        sorted[category] = artistsArray;
+      });
+
+      setSortedTracks(sorted);
+      setProgress(100);
     } catch (error) {
-      console.error("Error fetching playlist:", error);
+      console.error("Eroare la încărcarea playlist-ului:", error);
+      alert("Eroare: " + error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Listă de artiști feminini cunoscuți (poți extinde lista)
-  const femaleArtists = [
-    "beyonce",
-    "rihanna",
-    "taylor swift",
-    "lady gaga",
-    "adele",
-    "ariana grande",
-    "dua lipa",
-    "billie eilish",
-    "doja cat",
-    "halsey",
-    "miley cyrus",
-    "selena gomez",
-    "shakira",
-    "nicki minaj",
-    "cardi b",
-    "megan thee stallion",
-    "lizzo",
-    "sza",
-    "anne-marie",
-    "ava max",
-    "camila cabello",
-    "dua lipa",
-    "ellie goulding",
-    "halsey",
-    "jessie j",
-    "katy perry",
-    "kesha",
-    "pink",
-    "rita ora",
-    "anne marie",
-  ];
-
-  // Listă de DJs (poți extinde lista)
-  const djs = [
-    "david guetta",
-    "calvin harris",
-    "tiësto",
-    "martin garrix",
-    "armin van buuren",
-    "afrojack",
-    "hardwell",
-    "steve aoki",
-    "kygo",
-    "avicii",
-    "alan walker",
-    "dj snake",
-    "major lazer",
-    "zedd",
-    "skrillex",
-    "diplo",
-    "alok",
-    "don diablo",
-    "kSHMR",
-    "vicetone",
-  ];
-
-  // Listă de rap/trap artists (poți extinde lista)
-  const rappers = [
-    "eminem",
-    "kendrick lamar",
-    "drake",
-    "kanye west",
-    "jay-z",
-    "travis scott",
-    "post malone",
-    "j. cole",
-    "lil wayne",
-    "nicki minaj",
-    "cardi b",
-    "snoop dogg",
-    "ice cube",
-    "50 cent",
-    "future",
-    "migos",
-    "lil baby",
-    "da baby",
-    "tyga",
-    "asap rocky",
-    "lil uzi vert",
-    "playboi carti",
-    "roddy ricch",
-    "meek mill",
-  ];
-
-  // Funcție pentru a sorta melodiile în categorii
-  const sortTracks = (tracks) => {
-    const sorted = {
-      female: {},
-      male: {},
-      dj: {},
-      rapper: {},
-      band: {},
-      soundtrack: {},
-      unsorted: {},
-    };
-
-    // Verifică dacă artistul are mai multe piese
-    const artistTrackCount = {};
-    tracks.forEach((item) => {
-      if (item.track && item.track.artists && item.track.artists.length > 0) {
-        const artistId = item.track.artists[0].id;
-        artistTrackCount[artistId] = (artistTrackCount[artistId] || 0) + 1;
-
-        // Obține detalii despre artist
-        fetchArtistDetails(artistId);
-      }
-    });
-
-    // Sortare în categorii
-    tracks.forEach((item) => {
-      if (!item.track || !item.track.artists || item.track.artists.length === 0)
-        return;
-
-      const track = item.track;
-      const artist = track.artists[0];
-      const artistId = artist.id;
-      const artistName = artist.name.toLowerCase();
-
-      // Determină categoria bazată pe numele artistului și alte criterii
-      let category = "unsorted";
-
-      if (femaleArtists.some((female) => artistName.includes(female))) {
-        category = "female";
-      } else if (
-        djs.some(
-          (dj) => artistName.includes(dj) || artistName.startsWith("dj ")
-        )
-      ) {
-        category = "dj";
-      } else if (rappers.some((rapper) => artistName.includes(rapper))) {
-        category = "rapper";
-      } else if (
-        artistName.includes("band") ||
-        artistName.includes("trupa") ||
-        artistName.includes("&") ||
-        artistName.includes("and the") ||
-        (track.artists.length > 1 && !artistName.includes("feat"))
-      ) {
-        category = "band";
-      } else if (artistTrackCount[artistId] === 1) {
-        category = "unsorted";
-      } else {
-        // Presupunem că este băiat dacă nu s-a încadrat în alte categorii
-        category = "male";
-      }
-
-      if (!sorted[category][artistId]) {
-        sorted[category][artistId] = {
-          artist: artist,
-          tracks: [],
-        };
-      }
-
-      sorted[category][artistId].tracks.push(track);
-    });
-
-    // Sortare alfabetică artiști în fiecare categorie
-    Object.keys(sorted).forEach((category) => {
-      const artistsArray = Object.values(sorted[category]);
-      artistsArray.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
-      sorted[category] = artistsArray;
-    });
-
-    setSortedTracks(sorted);
-  };
-
-  // Funcție pentru a deschide/închide lista de piese a unui artist
+  // Funcție pentru a deschide/închide lista de piese
   const toggleArtist = (category, artistId) => {
     const key = `${category}-${artistId}`;
     if (expandedArtist === key) {
@@ -327,23 +382,30 @@ export function Artisti() {
         </button>
       </div>
 
-      {!playlist && !isLoading && (
+      {isLoading && (
+        <div className={styles.loading}>
+          <div className={styles.progressBar}>
+            <div
+              className={styles.progressFill}
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <p>Se încarcă playlist-ul... {progress}%</p>
+          <p>Procesez {totalTracks} piese...</p>
+        </div>
+      )}
+
+      {!isLoading && !sortedTracks && (
         <div className={styles.placeholder}>
           <p>Apasă "Încarcă Playlist" pentru a vedea melodiile sortate</p>
         </div>
       )}
 
-      {isLoading && (
-        <div className={styles.loading}>
-          <div className={styles.spinner}></div>
-          <p>Se încarcă playlist-ul...</p>
-        </div>
-      )}
-
-      {sortedTracks ? (
+      {sortedTracks && (
         <div className={styles.sortedContainer}>
           {Object.keys(categories).map(
             (category) =>
+              sortedTracks[category] &&
               sortedTracks[category].length > 0 && (
                 <div key={category} className={styles.category}>
                   <h3 className={styles.categoryTitle}>
@@ -389,28 +451,6 @@ export function Artisti() {
                 </div>
               )
           )}
-        </div>
-      ) : (
-        <div className={styles.tableContainer}>
-          {/* Header-ul tabelului */}
-          <div className={styles.tableHeader}>Fete</div>
-          <div className={styles.tableHeader}>Baieti</div>
-          <div className={styles.tableHeader}>DJ</div>
-          <div className={styles.tableHeader}>Rapari/Trapari</div>
-          <div className={styles.tableHeader}>Trupe</div>
-          <div className={styles.tableHeader}>Coloana Sonora</div>
-          <div className={styles.tableHeader}>
-            Artisti cu o piesa in playlist
-          </div>
-
-          {/* Secțiunea de conținut, care va conține liniile verticale care merg până jos */}
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
-          <div className={styles.tableContentCell}></div>
         </div>
       )}
     </div>
