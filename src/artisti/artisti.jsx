@@ -1,6 +1,13 @@
+import { useNavigate } from "react-router-dom";
 import styles from "./artisti.module.css";
 
 export function Artisti() {
+  const navigate = useNavigate();
+
+  const handleNavigateToTabel = () => {
+    navigate("/tabel");
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -11,6 +18,15 @@ export function Artisti() {
       </header>
 
       <h2 className={styles.mainHeading}>ARTISTI TAI INDRAGITI</h2>
+
+      <div className={styles.buttonContainer}>
+        <button
+          className={styles.navigationButton}
+          onClick={handleNavigateToTabel}
+        >
+          Vezi Tabelul
+        </button>
+      </div>
 
       <div className={styles.tableContainer}>
         {/* Header-ul tabelului */}

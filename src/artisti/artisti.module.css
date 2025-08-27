@@ -40,6 +40,35 @@
   color: #1ed760;
 }
 
+.buttonContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: clamp(20px, 5vh, 40px);
+}
+
+.navigationButton {
+  background-color: #1ed760;
+  color: #000;
+  border: none;
+  border-radius: 30px;
+  padding: clamp(12px, 2vw, 16px) clamp(24px, 4vw, 32px);
+  font-size: clamp(16px, 2.5vw, 20px);
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(30, 215, 96, 0.3);
+}
+
+.navigationButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(30, 215, 96, 0.5);
+}
+
+.navigationButton:active {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px 8px rgba(30, 215, 96, 0.7);
+}
+
 .tableContainer {
   width: 100%;
   display: grid;
