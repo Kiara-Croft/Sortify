@@ -1,6 +1,21 @@
 import styles from "./prezentare.module.css";
 
 export function Prezentare() {
+  const authEndpoint = "https://accounts.spotify.com/authorize";
+  // ⚡ Modifică aici Client ID-ul și redirect URI-ul
+  const clientId = "5c850d0891ff424abb1f7816057eee8f"; // Pune Client ID-ul tău de la Spotify
+  const redirectUri = "https://melody-lab.netlify.app/callback"; // Redirect-ul tău Netlify
+  const scopes = [
+    "playlist-read-private",
+    "user-library-read",
+    "playlist-modify-private",
+    "playlist-modify-public",
+  ];
+
+  const loginUrl = `${authEndpoint}?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes.join(
+    "%20"
+  )}&response_type=code&show_dialog=true`;
+
   return (
     <div className={styles.container}>
       <div className={styles.mainContent}>
@@ -10,7 +25,13 @@ export function Prezentare() {
             <p>ASUPRA PLAYLISTURILOR</p>
             <p>TALE CU MELODY LAB</p>
           </div>
-          <button className={styles.loginButton}>
+          <button
+            className={styles.loginButton}
+            onClick={() => {
+              console.log("LOGIN CLICK"); // test să vedem dacă apasă
+              window.location.href = loginUrl;
+            }}
+          >
             LOGIN CU CONTUL DE SPOTIFY
           </button>
         </div>
