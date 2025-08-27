@@ -21,6 +21,7 @@ app.post("/get-token", async (req, res) => {
     const params = new URLSearchParams();
     params.append("grant_type", "authorization_code");
     params.append("code", code);
+
     params.append("redirect_uri", redirect_uri);
 
     const headers = {
