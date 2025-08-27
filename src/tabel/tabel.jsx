@@ -1,6 +1,12 @@
 import styles from "./tabel.module.css";
+import { useNavigate } from "react-router-dom";
 
 export function Tabel() {
+  const navigate = useNavigate();
+
+  const handleNavigateToTabel = () => {
+    navigate("/artisti");
+  };
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -15,7 +21,7 @@ export function Tabel() {
             className={styles.navigationButton}
             onClick={handleNavigateToTabel}
           >
-            Vezi Tabelul
+            Vezi Artisti
           </button>
         </div>
         <h2 className={styles.mainTitle}>TABELUL CU PIESELE FRUMOS ARANJATE</h2>
