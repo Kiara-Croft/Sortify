@@ -24,6 +24,7 @@ export function Tabel() {
             Vezi Artisti
           </button>
         </div>
+
         <h2 className={styles.mainTitle}>TABELUL CU PIESELE FRUMOS ARANJATE</h2>
         <div className={styles.tableContainer}>
           <div className={styles.tableHeader}>

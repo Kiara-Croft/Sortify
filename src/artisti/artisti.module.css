@@ -10,14 +10,17 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: clamp(20px, 5vh, 50px);
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
 .logoContainer {
   width: clamp(24px, 3vw, 40px);
   height: clamp(24px, 3vw, 40px);
   margin-right: clamp(5px, 1vw, 15px);
-  flex-shrink: 0; /* nu se micșorează aiurea */
+  flex-shrink: 0;
 }
 
 .logo {
@@ -31,6 +34,44 @@
   font-weight: bold;
   color: #1ed760;
   margin: 0;
+  flex-grow: 1;
+}
+
+.headerButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.spotifyButton,
+.logoutButton {
+  background-color: #1ed760;
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: clamp(8px, 1.5vw, 12px) clamp(16px, 3vw, 24px);
+  font-size: clamp(12px, 1.8vw, 16px);
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.spotifyButton:hover,
+.logoutButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(30, 215, 96, 0.5);
+}
+
+.spotifyButton:disabled {
+  background-color: #4a4a4a;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.logoutButton {
+  background-color: #e22134;
+  color: white;
 }
 
 .mainHeading {
@@ -58,7 +99,6 @@
   transition: all 0.3s ease;
   box-shadow: 0 4px 8px rgba(30, 215, 96, 0.3);
   white-space: nowrap;
-  margin-left: auto; /* Asigură poziționarea în dreapta */
 }
 
 .navigationButton:hover {
@@ -71,6 +111,103 @@
   box-shadow: 0 0 20px 8px rgba(30, 215, 96, 0.7);
 }
 
+.placeholder {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #888;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(30, 215, 96, 0.3);
+  border-radius: 50%;
+  border-top-color: #1ed760;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sortedContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.category {
+  background-color: #121212;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #333;
+}
+
+.categoryTitle {
+  font-size: 18px;
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #1ed760;
+  color: #1ed760;
+}
+
+.artistsList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.artistItem {
+  margin-bottom: 5px;
+}
+
+.artistName {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #1a1a1a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.artistName:hover {
+  background-color: #2a2a2a;
+}
+
+.toggleIcon {
+  font-size: 12px;
+}
+
+.tracksList {
+  margin-top: 5px;
+  margin-left: 20px;
+  border-left: 2px solid #1ed760;
+  padding-left: 10px;
+}
+
+.track {
+  padding: 5px 10px;
+  background-color: #252525;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
 .tableContainer {
   width: 100%;
   display: grid;
@@ -80,7 +217,7 @@
   border-left: 2px solid #1ed760;
   border-right: 2px solid #1ed760;
   min-height: clamp(300px, 50vh, 600px);
-  overflow-x: auto; /* dacă ecranul e mic, face scroll orizontal */
+  overflow-x: auto;
 }
 
 .tableHeader {
@@ -107,4 +244,26 @@
 
 .tableContentCell:last-child {
   border-right: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerButtons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sortedContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .tableContainer {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(7, auto) 1fr;
+  }
 }
