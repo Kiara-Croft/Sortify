@@ -64,3 +64,28 @@
   font-weight: bold;
   font-size: 1.1rem;
 }
+
+.navigationButton {
+  background-color: #1ed760;
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: clamp(8px, 1.5vw, 12px) clamp(16px, 3vw, 24px);
+  font-size: clamp(14px, 2vw, 18px);
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(30, 215, 96, 0.3);
+  white-space: nowrap;
+  margin-left: auto; /* Asigură poziționarea în dreapta */
+}
+
+.navigationButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(30, 215, 96, 0.5);
+}
+
+.navigationButton:active {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px 8px rgba(30, 215, 96, 0.7);
+}

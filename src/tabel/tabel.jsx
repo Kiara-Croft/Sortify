@@ -10,6 +10,14 @@ export function Tabel() {
         </div>
       </header>
       <main>
+        <div className={styles.buttonContainer}>
+          <button
+            className={styles.navigationButton}
+            onClick={handleNavigateToTabel}
+          >
+            Vezi Tabelul
+          </button>
+        </div>
         <h2 className={styles.mainTitle}>TABELUL CU PIESELE FRUMOS ARANJATE</h2>
         <div className={styles.tableContainer}>
           <div className={styles.tableHeader}>
