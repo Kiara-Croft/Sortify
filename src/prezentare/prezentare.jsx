@@ -3,7 +3,7 @@ import styles from "./prezentare.module.css";
 export function Prezentare() {
   const authEndpoint = "https://accounts.spotify.com/authorize";
   // ⚡ Modifică aici Client ID-ul și redirect URI-ul
-  const clientId = ""; // Pune Client ID-ul tău de la Spotify
+  const clientId = "5c850d0891ff424abb1f7816057eee8f"; // Pune Client ID-ul tău de la Spotify
   const redirectUri = "https://melody-lab.netlify.app/callback"; // Redirect-ul tău Netlify
   const scopes = [
     "playlist-read-private",
