@@ -24,15 +24,30 @@ app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 const mongoURI = process.env.MONGO_URI;
 if (!mongoURI) {
   console.error("❌ MONGO_URI lipsă din environment!");
+} else {
+  // Debug: afișează URI-ul (fără parolă pentru securitate)
+  const safeURI = mongoURI.replace(/:[^:]*@/, ":****@");
+  console.log("⏳ Încerc conectarea la:", safeURI);
 }
 
+// REVENIM LA SETĂRILE ORIGINALE care funcționau
 mongoose
   .connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
   .then(() => console.log("✅ MongoDB conectat"))
-  .catch((err) => console.error("❌ MongoDB error:", err.message));
+  .catch((err) => {
+    console.error("❌ MongoDB error:", err.message);
+
+    // Debug detaliat pentru probleme de autentificare
+    if (err.message.includes("authentication failed")) {
+      console.log("🔍 Verifică:");
+      console.log("1. Username-ul și parola din connection string");
+      console.log("2. Dacă parola conține caractere speciale");
+      console.log("3. Dacă userul are permisiuni pentru database");
+    }
+  });
 
 /* === Schema & Model === */
 const orderSchema = new mongoose.Schema(
