@@ -123,7 +123,7 @@ export function Artisti() {
     }
   }, [accessToken, navigate]);
 
-  // Încarcă ordinea salvată când componenta se mount-uie
+  // Încarcă ordinea salvată când avem accessToken
   useEffect(() => {
     if (accessToken) {
       loadSavedOrder();
@@ -132,27 +132,36 @@ export function Artisti() {
 
   const loadSavedOrder = async () => {
     const spotifyUserId = localStorage.getItem("spotifyUserId");
-    if (spotifyUserId && sortedTracks) {
+    if (spotifyUserId) {
       try {
+        console.log("⏳ Încarc ordinea pentru user:", spotifyUserId);
         const res = await fetch(
           `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
         );
+
         if (res.ok) {
           const savedOrder = await res.json();
-          applySavedOrder(savedOrder);
+          console.log("✅ Ordinea salvată încărcată:", savedOrder);
+
+          // Dacă avem deja track-uri sortate, aplică ordinea
+          if (sortedTracks) {
+            applySavedOrder(savedOrder);
+          }
+        } else if (res.status === 404) {
+          console.log("ℹ️ Nu există ordine salvată pentru acest user");
         }
       } catch (error) {
-        console.error("Eroare la încărcarea ordinii:", error);
+        console.error("❌ Eroare la încărcarea ordinii:", error);
       }
     }
   };
 
   const applySavedOrder = (savedOrder) => {
-    if (sortedTracks) {
+    if (sortedTracks && savedOrder) {
       const newSorted = { ...sortedTracks };
 
       Object.keys(savedOrder).forEach((category) => {
-        if (newSorted[category] && savedOrder[category].length > 0) {
+        if (newSorted[category] && Array.isArray(savedOrder[category])) {
           const orderedArtists = [];
           const artistMap = new Map();
 
@@ -177,6 +186,7 @@ export function Artisti() {
       });
 
       setSortedTracks(newSorted);
+      console.log("✅ Ordine aplicată cu succes!");
     }
   };
 
@@ -343,7 +353,9 @@ export function Artisti() {
           );
           if (res.ok) {
             savedOrder = await res.json();
-            console.log("Ordinea salvată:", savedOrder);
+            console.log("📦 Ordinea salvată:", savedOrder);
+          } else if (res.status === 404) {
+            console.log("ℹ️ Nu există ordine salvată încă");
           }
         } catch (error) {
           console.error("Eroare la încărcarea ordinii:", error);
@@ -413,35 +425,33 @@ export function Artisti() {
         sorted[category] = Object.values(sorted[category]);
       });
 
-      // Aplică ordinea salvată din backend
-      Object.keys(savedOrder).forEach((category) => {
-        if (
-          sorted[category] &&
-          savedOrder[category] &&
-          savedOrder[category].length > 0
-        ) {
-          const orderedArtists = [];
-          const artistMap = new Map();
+      // Aplică ordinea salvată din backend (dacă există)
+      if (Object.keys(savedOrder).length > 0) {
+        Object.keys(savedOrder).forEach((category) => {
+          if (sorted[category] && Array.isArray(savedOrder[category])) {
+            const orderedArtists = [];
+            const artistMap = new Map();
 
-          sorted[category].forEach((artist) => {
-            artistMap.set(artist.artist.id, artist);
-          });
+            sorted[category].forEach((artist) => {
+              artistMap.set(artist.artist.id, artist);
+            });
 
-          savedOrder[category].forEach((artistId) => {
-            const artist = artistMap.get(artistId);
-            if (artist) {
-              orderedArtists.push(artist);
-              artistMap.delete(artistId);
-            }
-          });
+            savedOrder[category].forEach((artistId) => {
+              const artist = artistMap.get(artistId);
+              if (artist) {
+                orderedArtists.push(artist);
+                artistMap.delete(artistId);
+              }
+            });
 
-          orderedArtists.push(...artistMap.values());
-          sorted[category] = orderedArtists;
-        }
-      });
+            orderedArtists.push(...artistMap.values());
+            sorted[category] = orderedArtists;
+          }
+        });
+      }
 
       console.log(
-        "Artisti procesați:",
+        "🎵 Artisti procesați:",
         Object.keys(sorted).map((cat) => ({
           category: cat,
           count: sorted[cat].length,
@@ -491,6 +501,7 @@ export function Artisti() {
     const spotifyUserId = localStorage.getItem("spotifyUserId");
     if (spotifyUserId) {
       try {
+        console.log("💾 Salvând ordinea:", orderToSave);
         const response = await fetch(
           `https://backend-tau.onrender.com/saveOrder`,
           {
@@ -501,7 +512,7 @@ export function Artisti() {
         );
 
         if (response.ok) {
-          console.log("✅ Ordine salvată cu succes!");
+          console.log("✅ Ordine salvată cu succes în backend!");
         } else {
           console.error(
             "❌ Eroare la salvarea ordinii:",
