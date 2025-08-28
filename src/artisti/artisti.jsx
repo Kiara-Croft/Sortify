@@ -21,24 +21,42 @@ const reorder = (list, startIndex, endIndex) => {
   return result;
 };
 
-// Funcție proxy pentru a evita CORS - MODIFICATĂ pentru backend
-const fetchWithCorsProxy = async (url, options = {}) => {
-  try {
-    // Dacă este cerere către backend, folosește proxy
-    if (url.includes("backend-tau.onrender.com")) {
-      const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-      const proxyResponse = await fetch(proxyUrl, {
+// Funcție proxy pentru backend cu multiple opțiuni
+const fetchBackend = async (url, options = {}) => {
+  const proxyUrls = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://proxy.cors.sh/${url}`,
+    `https://cors-anywhere.herokuapp.com/${url}`,
+  ];
+
+  for (const proxyUrl of proxyUrls) {
+    try {
+      console.log("🔗 Încerc proxy:", proxyUrl);
+      const response = await fetch(proxyUrl, {
         ...options,
         headers: {
           ...options.headers,
           "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
         },
       });
-      return proxyResponse;
-    }
 
-    // Pentru cererile către Spotify, folosește direct
+      if (response.ok) {
+        console.log("✅ Proxy reușit:", proxyUrl);
+        return response;
+      }
+    } catch (error) {
+      console.log("❌ Proxy eșuat:", proxyUrl, error.message);
+      continue;
+    }
+  }
+
+  throw new Error("Toate proxy-urile au eșuat");
+};
+
+// Funcție proxy pentru Spotify
+const fetchWithCorsProxy = async (url, options = {}) => {
+  try {
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -49,39 +67,18 @@ const fetchWithCorsProxy = async (url, options = {}) => {
 
     if (response.ok) return response;
 
-    // Fallback la proxy dacă cererea directă eșuează
-    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
     const proxyResponse = await fetch(proxyUrl, {
       ...options,
       headers: {
         ...options.headers,
         "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
       },
     });
 
     return proxyResponse;
   } catch (error) {
     console.error("Eroare la fetch:", error);
-    throw error;
-  }
-};
-
-// Funcție specială doar pentru backend
-const fetchBackend = async (url, options = {}) => {
-  const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-  try {
-    const response = await fetch(proxyUrl, {
-      ...options,
-      headers: {
-        ...options.headers,
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-      },
-    });
-    return response;
-  } catch (error) {
-    console.error("Eroare la fetch backend:", error);
     throw error;
   }
 };
@@ -178,7 +175,6 @@ export function Artisti() {
           const savedOrder = await res.json();
           console.log("✅ Ordinea salvată încărcată:", savedOrder);
 
-          // Dacă avem deja track-uri sortate, aplică ordinea
           if (sortedTracks) {
             applySavedOrder(savedOrder);
           }
@@ -200,12 +196,10 @@ export function Artisti() {
           const orderedArtists = [];
           const artistMap = new Map();
 
-          // Creează map pentru artiștii existenți
           newSorted[category].forEach((artist) => {
             artistMap.set(artist.artist.id, artist);
           });
 
-          // Adaugă artiștii în ordinea salvată
           savedOrder[category].forEach((artistId) => {
             const artist = artistMap.get(artistId);
             if (artist) {
@@ -214,7 +208,6 @@ export function Artisti() {
             }
           });
 
-          // Adaugă artiștii rămași (noi) la final
           orderedArtists.push(...artistMap.values());
           newSorted[category] = orderedArtists;
         }
@@ -369,7 +362,6 @@ export function Artisti() {
     setTotalTracks(0);
 
     try {
-      // Obține sau creează spotifyUserId
       let spotifyUserId = localStorage.getItem("spotifyUserId");
       if (!spotifyUserId) {
         const userData = await fetchUserProfile(accessToken);
@@ -379,7 +371,6 @@ export function Artisti() {
         }
       }
 
-      // Încarcă ordinea salvată din backend
       let savedOrder = {};
       if (spotifyUserId) {
         try {
@@ -455,12 +446,10 @@ export function Artisti() {
         sorted[category][artistId].tracks.push(track);
       }
 
-      // Transformă obiectele în array-uri
       Object.keys(sorted).forEach((category) => {
         sorted[category] = Object.values(sorted[category]);
       });
 
-      // Aplică ordinea salvată din backend (dacă există)
       if (Object.keys(savedOrder).length > 0) {
         Object.keys(savedOrder).forEach((category) => {
           if (sorted[category] && Array.isArray(savedOrder[category])) {
@@ -527,7 +516,6 @@ export function Artisti() {
 
     setSortedTracks(newSorted);
 
-    // 🔹 Salvează ordinea în backend
     const orderToSave = {};
     Object.keys(newSorted).forEach((cat) => {
       orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
