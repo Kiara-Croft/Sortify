@@ -300,10 +300,9 @@ export function Artisti() {
         sorted[category][artistId].tracks.push(track);
       }
 
+      // ❌ Eliminăm sortarea alfabetică – păstrăm ordinea din backend
       Object.keys(sorted).forEach((category) => {
-        const artistsArray = Object.values(sorted[category]);
-        artistsArray.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
-        sorted[category] = artistsArray;
+        sorted[category] = Object.values(sorted[category]);
       });
 
       // 🔹 Încarcă ordinea din backend
