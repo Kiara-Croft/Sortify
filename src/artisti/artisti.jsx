@@ -24,7 +24,6 @@ const reorder = (list, startIndex, endIndex) => {
 // Funcție proxy pentru a evita CORS
 const fetchWithCorsProxy = async (url, options = {}) => {
   try {
-    // Încearcă mai întâi direct
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -35,7 +34,6 @@ const fetchWithCorsProxy = async (url, options = {}) => {
 
     if (response.ok) return response;
 
-    // Dacă direct nu merge, încearcă cu proxy
     const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
     const proxyResponse = await fetch(proxyUrl, {
       ...options,
@@ -65,7 +63,6 @@ export function Artisti() {
   const [progress, setProgress] = useState(0);
   const [totalTracks, setTotalTracks] = useState(0);
 
-  // Categorii EXACT cum le-ai definit
   const categories = {
     female: "Fete",
     male: "Baieti",
@@ -102,7 +99,6 @@ export function Artisti() {
     }
   }, [accessToken, navigate]);
 
-  // Funcție pentru autentificare Spotify
   const handleLogin = () => {
     const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(
       SPOTIFY_REDIRECT_URI
@@ -110,20 +106,16 @@ export function Artisti() {
     window.location.href = authUrl;
   };
 
-  // Funcție pentru a obține toate melodiile din playlist
   const fetchAllPlaylistTracks = async (playlistId) => {
     let allTracks = [];
     let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
     let fetched = 0;
     let total = 0;
 
-    // Mai întâi obține numărul total de piese
     const initialResponse = await fetchWithCorsProxy(
       `https://api.spotify.com/v1/playlists/${playlistId}`,
       {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
 
@@ -135,9 +127,7 @@ export function Artisti() {
 
     while (nextUrl) {
       const response = await fetchWithCorsProxy(nextUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       if (!response.ok) {
@@ -163,35 +153,26 @@ export function Artisti() {
     return allTracks;
   };
 
-  // Funcție pentru a obține detalii despre artist
   const fetchArtistDetails = async (artistId) => {
     try {
       const response = await fetchWithCorsProxy(
         `https://api.spotify.com/v1/artists/${artistId}`,
         {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
 
-      if (response.ok) {
-        return await response.json();
-      }
+      if (response.ok) return await response.json();
     } catch (error) {
       console.error("Error fetching artist:", error);
     }
     return null;
   };
 
-  // Funcție pentru a determina categoria artistului
   const determineArtistCategory = (artistName, genres, trackCount) => {
     const name = artistName.toLowerCase();
-
-    if (name.includes("dj ") || name.startsWith("dj") || name.endsWith("dj")) {
+    if (name.includes("dj ") || name.startsWith("dj") || name.endsWith("dj"))
       return "dj";
-    }
-
     if (genres && genres.length > 0) {
       const genreStr = genres.join(" ").toLowerCase();
       if (
@@ -199,11 +180,9 @@ export function Artisti() {
         genreStr.includes("hip hop") ||
         genreStr.includes("trap") ||
         genreStr.includes("drill")
-      ) {
+      )
         return "rapper";
-      }
     }
-
     if (
       name.includes("&") ||
       name.includes(" and ") ||
@@ -217,26 +196,18 @@ export function Artisti() {
       name.includes("project") ||
       name.includes("group") ||
       name.includes("trupa")
-    ) {
+    )
       return "band";
-    }
-
     if (
       name.includes("soundtrack") ||
       name.includes("score") ||
       name.includes("original") ||
       name.includes("motion picture")
-    ) {
+    )
       return "soundtrack";
-    }
-
-    if (trackCount === 1) {
-      return "unsorted";
-    }
-
+    if (trackCount === 1) return "unsorted";
     if (genres && genres.length > 0) {
       const genreStr = genres.join(" ").toLowerCase();
-
       if (
         genreStr.includes("pop") ||
         genreStr.includes("r&b") ||
@@ -244,10 +215,8 @@ export function Artisti() {
         genreStr.includes("latin") ||
         genreStr.includes("dance pop") ||
         genreStr.includes("electropop")
-      ) {
+      )
         return "female";
-      }
-
       if (
         genreStr.includes("rock") ||
         genreStr.includes("metal") ||
@@ -255,15 +224,13 @@ export function Artisti() {
         genreStr.includes("alternative") ||
         genreStr.includes("edm") ||
         genreStr.includes("electronic")
-      ) {
+      )
         return "male";
-      }
     }
-
     return "male";
   };
 
-  // Funcție pentru a obține playlist-ul
+  // --- FETCH PLAYLIST + LOAD ORDINE DIN BACKEND ---
   const fetchPlaylist = async () => {
     if (!accessToken) {
       handleLogin();
@@ -278,9 +245,8 @@ export function Artisti() {
       const playlistId = "3aUY5hCQoliumlMGmFB3E4";
       const allTracks = await fetchAllPlaylistTracks(playlistId);
 
-      if (allTracks.length === 0) {
+      if (allTracks.length === 0)
         throw new Error("Nu s-au putut obține melodiile din playlist");
-      }
 
       const sorted = {
         female: {},
@@ -328,12 +294,8 @@ export function Artisti() {
 
         let category = determineArtistCategory(artist.name, genres, trackCount);
 
-        if (!sorted[category][artistId]) {
-          sorted[category][artistId] = {
-            artist: artist,
-            tracks: [],
-          };
-        }
+        if (!sorted[category][artistId])
+          sorted[category][artistId] = { artist: artist, tracks: [] };
 
         sorted[category][artistId].tracks.push(track);
       }
@@ -344,19 +306,25 @@ export function Artisti() {
         sorted[category] = artistsArray;
       });
 
-      // Încearcă să încarci ordinea custom din localStorage
-      const savedOrder = JSON.parse(
-        localStorage.getItem("artistOrder") || "{}"
-      );
-      Object.keys(savedOrder).forEach((cat) => {
-        if (sorted[cat]) {
-          sorted[cat].sort(
-            (a, b) =>
-              savedOrder[cat].indexOf(a.artist.id) -
-              savedOrder[cat].indexOf(b.artist.id)
-          );
+      // 🔹 Încarcă ordinea din backend
+      const spotifyUserId = localStorage.getItem("spotifyUserId"); // trebuie să-l ai deja salvat
+      if (spotifyUserId) {
+        const res = await fetch(
+          `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
+        );
+        if (res.ok) {
+          const savedOrder = await res.json();
+          Object.keys(savedOrder).forEach((cat) => {
+            if (sorted[cat]) {
+              sorted[cat].sort(
+                (a, b) =>
+                  savedOrder[cat].indexOf(a.artist.id) -
+                  savedOrder[cat].indexOf(b.artist.id)
+              );
+            }
+          });
         }
-      });
+      }
 
       setSortedTracks(sorted);
       setProgress(100);
@@ -368,69 +336,49 @@ export function Artisti() {
     }
   };
 
-  // Drag & Drop
-  const handleDragEnd = (result) => {
+  // --- DRAG & DROP ---
+  const handleDragEnd = async (result) => {
     if (!result.destination) return;
 
     const sourceCategory = result.source.droppableId;
     const destCategory = result.destination.droppableId;
+    const newSorted = { ...sortedTracks };
 
-    // Dacă mutăm în aceeași categorie
     if (sourceCategory === destCategory) {
-      const items = reorder(
+      newSorted[sourceCategory] = reorder(
         sortedTracks[sourceCategory],
         result.source.index,
         result.destination.index
       );
-
-      const newSorted = {
-        ...sortedTracks,
-        [sourceCategory]: items,
-      };
-
-      setSortedTracks(newSorted);
-
-      // Salvăm ordinea în localStorage
-      const orderToSave = {};
-      Object.keys(newSorted).forEach((cat) => {
-        orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
-      });
-      localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
-    }
-    // Dacă mutăm între categorii diferite
-    else {
-      // Copiem starea actuală
-      const newSorted = { ...sortedTracks };
-
-      // Extragem artistul din categoria sursă
+    } else {
       const [movedArtist] = newSorted[sourceCategory].splice(
         result.source.index,
         1
       );
-
-      // Adăugăm artistul în categoria destinație
       newSorted[destCategory].splice(result.destination.index, 0, movedArtist);
+    }
 
-      // Actualizăm starea
-      setSortedTracks(newSorted);
+    setSortedTracks(newSorted);
 
-      // Salvăm ordinea în localStorage
-      const orderToSave = {};
-      Object.keys(newSorted).forEach((cat) => {
-        orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
+    // 🔹 Salvează ordinea în backend
+    const orderToSave = {};
+    Object.keys(newSorted).forEach((cat) => {
+      orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
+    });
+
+    const spotifyUserId = localStorage.getItem("spotifyUserId");
+    if (spotifyUserId) {
+      await fetch(`https://backend-tau.onrender.com/saveOrder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spotifyUserId, order: orderToSave }),
       });
-      localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
     }
   };
 
-  // Funcție pentru toggle artist
   const toggleArtist = (category, artistId) => {
     const key = `${category}-${artistId}`;
-    if (expandedArtist === key) {
-      setExpandedArtist(null);
-    } else {
-      setExpandedArtist(key);
-    }
+    setExpandedArtist(expandedArtist === key ? null : key);
   };
 
   const handleLogout = () => {
