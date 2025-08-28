@@ -21,6 +21,38 @@ const reorder = (list, startIndex, endIndex) => {
   return result;
 };
 
+// Funcție proxy pentru a evita CORS
+const fetchWithCorsProxy = async (url, options = {}) => {
+  try {
+    // Încearcă mai întâi direct
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (response.ok) return response;
+
+    // Dacă direct nu merge, încearcă cu proxy
+    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+    const proxyResponse = await fetch(proxyUrl, {
+      ...options,
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+
+    return proxyResponse;
+  } catch (error) {
+    console.error("Eroare la fetch:", error);
+    throw error;
+  }
+};
+
 export function Artisti() {
   const navigate = useNavigate();
   const [accessToken, setAccessToken] = useState(
@@ -86,7 +118,7 @@ export function Artisti() {
     let total = 0;
 
     // Mai întâi obține numărul total de piese
-    const initialResponse = await fetch(
+    const initialResponse = await fetchWithCorsProxy(
       `https://api.spotify.com/v1/playlists/${playlistId}`,
       {
         headers: {
@@ -102,7 +134,7 @@ export function Artisti() {
     }
 
     while (nextUrl) {
-      const response = await fetch(nextUrl, {
+      const response = await fetchWithCorsProxy(nextUrl, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -134,7 +166,7 @@ export function Artisti() {
   // Funcție pentru a obține detalii despre artist
   const fetchArtistDetails = async (artistId) => {
     try {
-      const response = await fetch(
+      const response = await fetchWithCorsProxy(
         `https://api.spotify.com/v1/artists/${artistId}`,
         {
           headers: {
