@@ -372,26 +372,55 @@ export function Artisti() {
   const handleDragEnd = (result) => {
     if (!result.destination) return;
 
-    const category = result.source.droppableId;
-    const items = reorder(
-      sortedTracks[category],
-      result.source.index,
-      result.destination.index
-    );
+    const sourceCategory = result.source.droppableId;
+    const destCategory = result.destination.droppableId;
 
-    const newSorted = {
-      ...sortedTracks,
-      [category]: items,
-    };
+    // Dacă mutăm în aceeași categorie
+    if (sourceCategory === destCategory) {
+      const items = reorder(
+        sortedTracks[sourceCategory],
+        result.source.index,
+        result.destination.index
+      );
 
-    setSortedTracks(newSorted);
+      const newSorted = {
+        ...sortedTracks,
+        [sourceCategory]: items,
+      };
 
-    // Salvăm ordinea în localStorage
-    const orderToSave = {};
-    Object.keys(newSorted).forEach((cat) => {
-      orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
-    });
-    localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
+      setSortedTracks(newSorted);
+
+      // Salvăm ordinea în localStorage
+      const orderToSave = {};
+      Object.keys(newSorted).forEach((cat) => {
+        orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
+      });
+      localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
+    }
+    // Dacă mutăm între categorii diferite
+    else {
+      // Copiem starea actuală
+      const newSorted = { ...sortedTracks };
+
+      // Extragem artistul din categoria sursă
+      const [movedArtist] = newSorted[sourceCategory].splice(
+        result.source.index,
+        1
+      );
+
+      // Adăugăm artistul în categoria destinație
+      newSorted[destCategory].splice(result.destination.index, 0, movedArtist);
+
+      // Actualizăm starea
+      setSortedTracks(newSorted);
+
+      // Salvăm ordinea în localStorage
+      const orderToSave = {};
+      Object.keys(newSorted).forEach((cat) => {
+        orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
+      });
+      localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
+    }
   };
 
   // Funcție pentru toggle artist
