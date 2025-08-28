@@ -21,9 +21,24 @@ const reorder = (list, startIndex, endIndex) => {
   return result;
 };
 
-// Funcție proxy pentru a evita CORS
+// Funcție proxy pentru a evita CORS - MODIFICATĂ pentru backend
 const fetchWithCorsProxy = async (url, options = {}) => {
   try {
+    // Dacă este cerere către backend, folosește proxy
+    if (url.includes("backend-tau.onrender.com")) {
+      const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+      const proxyResponse = await fetch(proxyUrl, {
+        ...options,
+        headers: {
+          ...options.headers,
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      return proxyResponse;
+    }
+
+    // Pentru cererile către Spotify, folosește direct
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -34,6 +49,7 @@ const fetchWithCorsProxy = async (url, options = {}) => {
 
     if (response.ok) return response;
 
+    // Fallback la proxy dacă cererea directă eșuează
     const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
     const proxyResponse = await fetch(proxyUrl, {
       ...options,
@@ -47,6 +63,25 @@ const fetchWithCorsProxy = async (url, options = {}) => {
     return proxyResponse;
   } catch (error) {
     console.error("Eroare la fetch:", error);
+    throw error;
+  }
+};
+
+// Funcție specială doar pentru backend
+const fetchBackend = async (url, options = {}) => {
+  const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+  try {
+    const response = await fetch(proxyUrl, {
+      ...options,
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    return response;
+  } catch (error) {
+    console.error("Eroare la fetch backend:", error);
     throw error;
   }
 };
@@ -135,7 +170,7 @@ export function Artisti() {
     if (spotifyUserId) {
       try {
         console.log("⏳ Încarc ordinea pentru user:", spotifyUserId);
-        const res = await fetch(
+        const res = await fetchBackend(
           `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
         );
 
@@ -348,7 +383,7 @@ export function Artisti() {
       let savedOrder = {};
       if (spotifyUserId) {
         try {
-          const res = await fetch(
+          const res = await fetchBackend(
             `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
           );
           if (res.ok) {
@@ -502,7 +537,7 @@ export function Artisti() {
     if (spotifyUserId) {
       try {
         console.log("💾 Salvând ordinea:", orderToSave);
-        const response = await fetch(
+        const response = await fetchBackend(
           `https://backend-tau.onrender.com/saveOrder`,
           {
             method: "POST",
@@ -589,7 +624,7 @@ export function Artisti() {
 
       {!isLoading && !sortedTracks && (
         <div className={styles.placeholder}>
-          <p>Apasă "Încarcă Playlist" pentru a vedea melodiile sortate</p>
+          <p>Apasă "Încarcă Playlist" pentru a vedere melodiile sortate</p>
         </div>
       )}
 
