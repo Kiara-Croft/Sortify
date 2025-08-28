@@ -7,20 +7,16 @@ const mongoose = require("mongoose");
 
 const app = express();
 
-/* === CORS ===
-   Pune aici origin-ul frontend-ului tău (Netlify/Vercel etc.)
-   Exemplu: https://melody-lab.netlify.app
-   Dacă vrei rapid, lasă temporary origin: "*" până testezi.
-*/
+/* === CORS === */
 app.use(
   cors({
-    origin: "*", // înlocuiește cu URL-ul frontend-ului când finalizezi
+    origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// Body parsers (mărim limita în caz că listele sunt mari)
+// Body parsers
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
@@ -94,7 +90,7 @@ app.post("/get-token", async (req, res) => {
       { headers }
     );
 
-    res.json(response.data); // access_token, refresh_token, expires_in
+    res.json(response.data);
   } catch (err) {
     console.error("Spotify token error:", err.response?.data || err.message);
     res.status(400).json({ error: "Nu s-a putut obține token-ul" });
@@ -138,6 +134,36 @@ app.get("/getOrder/:spotifyUserId", async (req, res) => {
   } catch (err) {
     console.error("Error fetching order:", err.message);
     res.status(500).json({ error: "Eroare la încărcarea ordinii" });
+  }
+});
+
+/* === Get Playlist Tracks === */
+app.get("/playlist", async (req, res) => {
+  try {
+    if (!process.env.SPOTIFY_ACCESS_TOKEN || !process.env.PLAYLIST_ID) {
+      return res.status(500).json({
+        error: "Lipsește SPOTIFY_ACCESS_TOKEN sau PLAYLIST_ID din .env",
+      });
+    }
+
+    const response = await axios.get(
+      `https://api.spotify.com/v1/playlists/${process.env.PLAYLIST_ID}/tracks`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN}`,
+        },
+      }
+    );
+
+    const data = response.data.items.map((item) => ({
+      artist: item.track.artists[0].name,
+      song: item.track.name,
+    }));
+
+    res.json(data);
+  } catch (err) {
+    console.error("Spotify playlist error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Nu s-a putut obține playlist-ul" });
   }
 });
 
