@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import styles from "./artisti.module.css";
 
 // CONFIGURARE SPOTIFY
@@ -11,6 +12,14 @@ const SPOTIFY_SCOPES = [
   "user-read-private",
   "user-read-email",
 ].join("%20");
+
+// Funcție mică pentru reordonare
+const reorder = (list, startIndex, endIndex) => {
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+  return result;
+};
 
 export function Artisti() {
   const navigate = useNavigate();
@@ -24,7 +33,7 @@ export function Artisti() {
   const [progress, setProgress] = useState(0);
   const [totalTracks, setTotalTracks] = useState(0);
 
-  // Categorii EXACT cum le-am definit
+  // Categorii EXACT cum le-ai definit
   const categories = {
     female: "Fete",
     male: "Baieti",
@@ -113,7 +122,6 @@ export function Artisti() {
       allTracks = [...allTracks, ...data.items];
       fetched += data.items.length;
 
-      // Actualizează progresul cu numărul real de piese
       setProgress(Math.min(100, Math.round((fetched / total) * 100)));
       nextUrl = data.next;
 
@@ -144,16 +152,14 @@ export function Artisti() {
     return null;
   };
 
-  // Funcție pentru a determina categoria artistului (FĂRĂ ARTISTI HARCODATI)
+  // Funcție pentru a determina categoria artistului
   const determineArtistCategory = (artistName, genres, trackCount) => {
     const name = artistName.toLowerCase();
 
-    // 1. Verifică DJ (prioritate maximă)
     if (name.includes("dj ") || name.startsWith("dj") || name.endsWith("dj")) {
       return "dj";
     }
 
-    // 2. Verifică Rap/Trap (prioritate high)
     if (genres && genres.length > 0) {
       const genreStr = genres.join(" ").toLowerCase();
       if (
@@ -166,7 +172,6 @@ export function Artisti() {
       }
     }
 
-    // 3. Verifică Trupe/Grupuri
     if (
       name.includes("&") ||
       name.includes(" and ") ||
@@ -184,7 +189,6 @@ export function Artisti() {
       return "band";
     }
 
-    // 4. Verifică Coloana Sonoră
     if (
       name.includes("soundtrack") ||
       name.includes("score") ||
@@ -194,16 +198,13 @@ export function Artisti() {
       return "soundtrack";
     }
 
-    // 5. Verifică artiști cu o singură piesă
     if (trackCount === 1) {
       return "unsorted";
     }
 
-    // 6. Folosește genurile Spotify pentru a determina genul artistului
     if (genres && genres.length > 0) {
       const genreStr = genres.join(" ").toLowerCase();
 
-      // Genuri care indică artiști feminini
       if (
         genreStr.includes("pop") ||
         genreStr.includes("r&b") ||
@@ -215,7 +216,6 @@ export function Artisti() {
         return "female";
       }
 
-      // Genuri care indică artiști masculini
       if (
         genreStr.includes("rock") ||
         genreStr.includes("metal") ||
@@ -228,7 +228,6 @@ export function Artisti() {
       }
     }
 
-    // 7. Dacă nu se poate determina, folosește "male" ca default
     return "male";
   };
 
@@ -251,7 +250,6 @@ export function Artisti() {
         throw new Error("Nu s-au putut obține melodiile din playlist");
       }
 
-      // Procesează melodiile
       const sorted = {
         female: {},
         male: {},
@@ -263,9 +261,8 @@ export function Artisti() {
       };
 
       const artistCache = {};
-
-      // Contorizează piese per artist
       const artistTrackCount = {};
+
       allTracks.forEach((item) => {
         if (item.track && item.track.artists && item.track.artists.length > 0) {
           const artistId = item.track.artists[0].id;
@@ -273,7 +270,6 @@ export function Artisti() {
         }
       });
 
-      // Procesează fiecare melodie
       for (let i = 0; i < allTracks.length; i++) {
         const item = allTracks[i];
         setProgress(Math.round((i / allTracks.length) * 100));
@@ -290,7 +286,6 @@ export function Artisti() {
         const artistId = artist.id;
         const trackCount = artistTrackCount[artistId] || 0;
 
-        // Obține detalii artist de la Spotify
         if (!artistCache[artistId]) {
           artistCache[artistId] = await fetchArtistDetails(artistId);
           await new Promise((resolve) => setTimeout(resolve, 20));
@@ -299,7 +294,6 @@ export function Artisti() {
         const artistDetails = artistCache[artistId];
         const genres = artistDetails ? artistDetails.genres : [];
 
-        // Determină categoria folosind DOAR datele de la Spotify
         let category = determineArtistCategory(artist.name, genres, trackCount);
 
         if (!sorted[category][artistId]) {
@@ -312,11 +306,24 @@ export function Artisti() {
         sorted[category][artistId].tracks.push(track);
       }
 
-      // Sortează artiștii alfabetic
       Object.keys(sorted).forEach((category) => {
         const artistsArray = Object.values(sorted[category]);
         artistsArray.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
         sorted[category] = artistsArray;
+      });
+
+      // Încearcă să încarci ordinea custom din localStorage
+      const savedOrder = JSON.parse(
+        localStorage.getItem("artistOrder") || "{}"
+      );
+      Object.keys(savedOrder).forEach((cat) => {
+        if (sorted[cat]) {
+          sorted[cat].sort(
+            (a, b) =>
+              savedOrder[cat].indexOf(a.artist.id) -
+              savedOrder[cat].indexOf(b.artist.id)
+          );
+        }
       });
 
       setSortedTracks(sorted);
@@ -329,7 +336,33 @@ export function Artisti() {
     }
   };
 
-  // Funcție pentru a deschide/închide lista de piese
+  // Drag & Drop
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+
+    const category = result.source.droppableId;
+    const items = reorder(
+      sortedTracks[category],
+      result.source.index,
+      result.destination.index
+    );
+
+    const newSorted = {
+      ...sortedTracks,
+      [category]: items,
+    };
+
+    setSortedTracks(newSorted);
+
+    // Salvăm ordinea în localStorage
+    const orderToSave = {};
+    Object.keys(newSorted).forEach((cat) => {
+      orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
+    });
+    localStorage.setItem("artistOrder", JSON.stringify(orderToSave));
+  };
+
+  // Funcție pentru toggle artist
   const toggleArtist = (category, artistId) => {
     const key = `${category}-${artistId}`;
     if (expandedArtist === key) {
@@ -339,7 +372,6 @@ export function Artisti() {
     }
   };
 
-  // Funcție pentru deconectare
   const handleLogout = () => {
     localStorage.removeItem("spotifyAccessToken");
     setAccessToken("");
@@ -402,56 +434,84 @@ export function Artisti() {
       )}
 
       {sortedTracks && (
-        <div className={styles.sortedContainer}>
-          {Object.keys(categories).map(
-            (category) =>
-              sortedTracks[category] &&
-              sortedTracks[category].length > 0 && (
-                <div key={category} className={styles.category}>
-                  <h3 className={styles.categoryTitle}>
-                    {categories[category]} ({sortedTracks[category].length})
-                  </h3>
-                  <div className={styles.artistsList}>
-                    {sortedTracks[category].map((artistData) => (
-                      <div
-                        key={artistData.artist.id}
-                        className={styles.artistItem}
-                      >
-                        <div
-                          className={styles.artistName}
-                          onClick={() =>
-                            toggleArtist(category, artistData.artist.id)
-                          }
-                        >
-                          {artistData.artist.name}
-                          <span className={styles.trackCount}>
-                            ({artistData.tracks.length})
-                          </span>
-                          <span className={styles.toggleIcon}>
-                            {expandedArtist ===
-                            `${category}-${artistData.artist.id}`
-                              ? "▲"
-                              : "▼"}
-                          </span>
-                        </div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className={styles.sortedContainer}>
+            {Object.keys(categories).map(
+              (category) =>
+                sortedTracks[category] &&
+                sortedTracks[category].length > 0 && (
+                  <div key={category} className={styles.category}>
+                    <h3 className={styles.categoryTitle}>
+                      {categories[category]} ({sortedTracks[category].length})
+                    </h3>
 
-                        {expandedArtist ===
-                          `${category}-${artistData.artist.id}` && (
-                          <div className={styles.tracksList}>
-                            {artistData.tracks.map((track) => (
-                              <div key={track.id} className={styles.track}>
-                                {track.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    <Droppable droppableId={category}>
+                      {(provided) => (
+                        <div
+                          className={styles.artistsList}
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                        >
+                          {sortedTracks[category].map((artistData, index) => (
+                            <Draggable
+                              key={artistData.artist.id}
+                              draggableId={artistData.artist.id}
+                              index={index}
+                            >
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={styles.artistItem}
+                                >
+                                  <div
+                                    className={styles.artistName}
+                                    onClick={() =>
+                                      toggleArtist(
+                                        category,
+                                        artistData.artist.id
+                                      )
+                                    }
+                                  >
+                                    {artistData.artist.name}
+                                    <span className={styles.trackCount}>
+                                      ({artistData.tracks.length})
+                                    </span>
+                                    <span className={styles.toggleIcon}>
+                                      {expandedArtist ===
+                                      `${category}-${artistData.artist.id}`
+                                        ? "▲"
+                                        : "▼"}
+                                    </span>
+                                  </div>
+
+                                  {expandedArtist ===
+                                    `${category}-${artistData.artist.id}` && (
+                                    <div className={styles.tracksList}>
+                                      {artistData.tracks.map((track) => (
+                                        <div
+                                          key={track.id}
+                                          className={styles.track}
+                                        >
+                                          {track.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
                   </div>
-                </div>
-              )
-          )}
-        </div>
+                )
+            )}
+          </div>
+        </DragDropContext>
       )}
     </div>
   );
