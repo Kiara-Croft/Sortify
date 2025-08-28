@@ -73,6 +73,27 @@ export function Artisti() {
     unsorted: "Artisti cu o piesa in playlist",
   };
 
+  // Funcție pentru a obține profilul utilizatorului
+  const fetchUserProfile = async (token) => {
+    try {
+      const response = await fetchWithCorsProxy(
+        "https://api.spotify.com/v1/me",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.ok) {
+        const userData = await response.json();
+        localStorage.setItem("spotifyUserId", userData.id);
+        return userData;
+      }
+    } catch (error) {
+      console.error("Eroare la obținerea profilului:", error);
+    }
+    return null;
+  };
+
   // Verifică token și autentificare
   useEffect(() => {
     const hash = window.location.hash;
@@ -89,6 +110,9 @@ export function Artisti() {
         localStorage.setItem("spotifyAccessToken", token);
         setAccessToken(token);
         window.location.hash = "";
+
+        // Obține user ID după login
+        fetchUserProfile(token);
       }
     }
 
@@ -98,6 +122,63 @@ export function Artisti() {
       setAccessToken(token);
     }
   }, [accessToken, navigate]);
+
+  // Încarcă ordinea salvată când componenta se mount-uie
+  useEffect(() => {
+    if (accessToken) {
+      loadSavedOrder();
+    }
+  }, [accessToken]);
+
+  const loadSavedOrder = async () => {
+    const spotifyUserId = localStorage.getItem("spotifyUserId");
+    if (spotifyUserId && sortedTracks) {
+      try {
+        const res = await fetch(
+          `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
+        );
+        if (res.ok) {
+          const savedOrder = await res.json();
+          applySavedOrder(savedOrder);
+        }
+      } catch (error) {
+        console.error("Eroare la încărcarea ordinii:", error);
+      }
+    }
+  };
+
+  const applySavedOrder = (savedOrder) => {
+    if (sortedTracks) {
+      const newSorted = { ...sortedTracks };
+
+      Object.keys(savedOrder).forEach((category) => {
+        if (newSorted[category] && savedOrder[category].length > 0) {
+          const orderedArtists = [];
+          const artistMap = new Map();
+
+          // Creează map pentru artiștii existenți
+          newSorted[category].forEach((artist) => {
+            artistMap.set(artist.artist.id, artist);
+          });
+
+          // Adaugă artiștii în ordinea salvată
+          savedOrder[category].forEach((artistId) => {
+            const artist = artistMap.get(artistId);
+            if (artist) {
+              orderedArtists.push(artist);
+              artistMap.delete(artistId);
+            }
+          });
+
+          // Adaugă artiștii rămași (noi) la final
+          orderedArtists.push(...artistMap.values());
+          newSorted[category] = orderedArtists;
+        }
+      });
+
+      setSortedTracks(newSorted);
+    }
+  };
 
   const handleLogin = () => {
     const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(
@@ -133,6 +214,7 @@ export function Artisti() {
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem("spotifyAccessToken");
+          localStorage.removeItem("spotifyUserId");
           setAccessToken("");
           navigate("/");
           return [];
@@ -242,6 +324,32 @@ export function Artisti() {
     setTotalTracks(0);
 
     try {
+      // Obține sau creează spotifyUserId
+      let spotifyUserId = localStorage.getItem("spotifyUserId");
+      if (!spotifyUserId) {
+        const userData = await fetchUserProfile(accessToken);
+        if (userData) {
+          spotifyUserId = userData.id;
+          localStorage.setItem("spotifyUserId", spotifyUserId);
+        }
+      }
+
+      // Încarcă ordinea salvată din backend
+      let savedOrder = {};
+      if (spotifyUserId) {
+        try {
+          const res = await fetch(
+            `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
+          );
+          if (res.ok) {
+            savedOrder = await res.json();
+            console.log("Ordinea salvată:", savedOrder);
+          }
+        } catch (error) {
+          console.error("Eroare la încărcarea ordinii:", error);
+        }
+      }
+
       const playlistId = "3aUY5hCQoliumlMGmFB3E4";
       const allTracks = await fetchAllPlaylistTracks(playlistId);
 
@@ -300,30 +408,45 @@ export function Artisti() {
         sorted[category][artistId].tracks.push(track);
       }
 
-      // ❌ Eliminăm sortarea alfabetică – păstrăm ordinea din backend
+      // Transformă obiectele în array-uri
       Object.keys(sorted).forEach((category) => {
         sorted[category] = Object.values(sorted[category]);
       });
 
-      // 🔹 Încarcă ordinea din backend
-      const spotifyUserId = localStorage.getItem("spotifyUserId"); // trebuie să-l ai deja salvat
-      if (spotifyUserId) {
-        const res = await fetch(
-          `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
-        );
-        if (res.ok) {
-          const savedOrder = await res.json();
-          Object.keys(savedOrder).forEach((cat) => {
-            if (sorted[cat]) {
-              sorted[cat].sort(
-                (a, b) =>
-                  savedOrder[cat].indexOf(a.artist.id) -
-                  savedOrder[cat].indexOf(b.artist.id)
-              );
+      // Aplică ordinea salvată din backend
+      Object.keys(savedOrder).forEach((category) => {
+        if (
+          sorted[category] &&
+          savedOrder[category] &&
+          savedOrder[category].length > 0
+        ) {
+          const orderedArtists = [];
+          const artistMap = new Map();
+
+          sorted[category].forEach((artist) => {
+            artistMap.set(artist.artist.id, artist);
+          });
+
+          savedOrder[category].forEach((artistId) => {
+            const artist = artistMap.get(artistId);
+            if (artist) {
+              orderedArtists.push(artist);
+              artistMap.delete(artistId);
             }
           });
+
+          orderedArtists.push(...artistMap.values());
+          sorted[category] = orderedArtists;
         }
-      }
+      });
+
+      console.log(
+        "Artisti procesați:",
+        Object.keys(sorted).map((cat) => ({
+          category: cat,
+          count: sorted[cat].length,
+        }))
+      );
 
       setSortedTracks(sorted);
       setProgress(100);
@@ -367,11 +490,27 @@ export function Artisti() {
 
     const spotifyUserId = localStorage.getItem("spotifyUserId");
     if (spotifyUserId) {
-      await fetch(`https://backend-tau.onrender.com/saveOrder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spotifyUserId, order: orderToSave }),
-      });
+      try {
+        const response = await fetch(
+          `https://backend-tau.onrender.com/saveOrder`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ spotifyUserId, order: orderToSave }),
+          }
+        );
+
+        if (response.ok) {
+          console.log("✅ Ordine salvată cu succes!");
+        } else {
+          console.error(
+            "❌ Eroare la salvarea ordinii:",
+            await response.text()
+          );
+        }
+      } catch (error) {
+        console.error("❌ Eroare la salvarea ordinii:", error);
+      }
     }
   };
 
@@ -382,7 +521,9 @@ export function Artisti() {
 
   const handleLogout = () => {
     localStorage.removeItem("spotifyAccessToken");
+    localStorage.removeItem("spotifyUserId");
     setAccessToken("");
+    setSortedTracks(null);
   };
 
   const handleNavigateToTabel = () => {
