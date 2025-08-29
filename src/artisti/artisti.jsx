@@ -72,6 +72,7 @@ export function Artisti() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [totalTracks, setTotalTracks] = useState(0);
+  const [playlistLoaded, setPlaylistLoaded] = useState(false);
 
   const categories = {
     female: "Fete",
@@ -313,6 +314,7 @@ export function Artisti() {
       return;
     }
     setIsLoading(true);
+    setPlaylistLoaded(true);
     setProgress(0);
     setTotalTracks(0);
     try {
@@ -479,15 +481,6 @@ export function Artisti() {
     const key = `${category}-${artistId}`;
     setExpandedArtist(expandedArtist === key ? null : key);
   };
-  const handleLogout = () => {
-    localStorage.removeItem("spotifyAccessToken");
-    localStorage.removeItem("spotifyUserId");
-    setAccessToken("");
-    setSortedTracks(null);
-  };
-  const handleNavigateToTabel = () => {
-    navigate("/tabel");
-  };
 
   return (
     <div className={styles.container}>
@@ -497,27 +490,18 @@ export function Artisti() {
           <img src="/logo.png" alt="Spotify Logo" className={styles.logo} />
         </div>
         <div className={styles.headerButtons}>
-          <button
-            className={styles.spotifyButton}
-            onClick={fetchPlaylist}
-            disabled={isLoading}
-          >
-            {isLoading ? "Se încarcă..." : "Încarcă Playlist"}
-          </button>
-          <button className={styles.logoutButton} onClick={handleLogout}>
-            Deconectare
-          </button>
+          {!playlistLoaded && (
+            <button
+              className={styles.spotifyButton}
+              onClick={fetchPlaylist}
+              disabled={isLoading}
+            >
+              {isLoading ? "Se încarcă..." : "Încarcă Playlist"}
+            </button>
+          )}
         </div>
       </header>
       <h2 className={styles.mainHeading}>ARTISTI TAI INDRAGITI</h2>
-      <div className={styles.buttonContainer}>
-        <button
-          className={styles.navigationButton}
-          onClick={handleNavigateToTabel}
-        >
-          Vezi Tabelul
-        </button>
-      </div>
       {isLoading && (
         <div className={styles.loading}>
           <div className={styles.progressBar}>
@@ -530,9 +514,9 @@ export function Artisti() {
           <p>Procesez {totalTracks} piese...</p>
         </div>
       )}
-      {!isLoading && !sortedTracks && (
+      {!isLoading && !sortedTracks && !playlistLoaded && (
         <div className={styles.placeholder}>
-          <p>Apasă "Încarcă Playlist" pentru a vedere melodiile sortate</p>
+          <p>Apasă "Încarcă Playlist" pentru a vedea melodiile sortate</p>
         </div>
       )}
       {sortedTracks && (
