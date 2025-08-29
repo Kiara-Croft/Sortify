@@ -34,14 +34,9 @@ if (!mongoURI) {
 }
 
 mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("✅ MongoDB conectat"))
-  .catch((err) => {
-    console.error("❌ MongoDB error:", err.message);
-  });
+  .catch((err) => console.error("❌ MongoDB error:", err.message));
 
 /* === Schema & Model === */
 const orderSchema = new mongoose.Schema(
@@ -51,11 +46,10 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 const Order = mongoose.model("Order", orderSchema);
 
 /* === Health check === */
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     mongo: mongoose.connection.readyState === 1 ? "connected" : "not-connected",
@@ -64,7 +58,7 @@ app.get("/health", (req, res) => {
 });
 
 /* === Spotify Token === */
-app.post("/get-token", async (req, res) => {
+app.post("/api/get-token", async (req, res) => {
   const { code, redirect_uri } = req.body;
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
     return res
@@ -104,7 +98,7 @@ app.post("/get-token", async (req, res) => {
 });
 
 /* === Save Order === */
-app.post("/saveOrder", async (req, res) => {
+app.post("/api/saveOrder", async (req, res) => {
   try {
     const { spotifyUserId, order } = req.body;
     if (!spotifyUserId || !order || typeof order !== "object") {
@@ -125,7 +119,7 @@ app.post("/saveOrder", async (req, res) => {
 });
 
 /* === Get Order === */
-app.get("/getOrder/:spotifyUserId", async (req, res) => {
+app.get("/api/getOrder/:spotifyUserId", async (req, res) => {
   try {
     const { spotifyUserId } = req.params;
     if (!spotifyUserId) {
@@ -140,7 +134,7 @@ app.get("/getOrder/:spotifyUserId", async (req, res) => {
 });
 
 /* === Get Playlist Tracks === */
-app.get("/playlist", async (req, res) => {
+app.get("/api/playlist", async (req, res) => {
   try {
     if (!process.env.SPOTIFY_ACCESS_TOKEN || !process.env.PLAYLIST_ID) {
       return res.status(500).json({
