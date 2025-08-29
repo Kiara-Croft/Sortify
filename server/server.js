@@ -10,7 +10,7 @@ const app = express();
 /* === CORS === */
 app.use(
   cors({
-    origin: ["https://melody-lab.netlify.app", "http://localhost:3000"],
+    origin: ["https://melody-lab.netlify.app", "http://localhost:8888"],
     methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
