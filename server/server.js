@@ -17,6 +17,9 @@ app.use(
   })
 );
 
+// ✅ fix pentru preflight OPTIONS
+app.options("*", cors());
+
 // Body parsers
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
@@ -38,12 +41,6 @@ mongoose
   .then(() => console.log("✅ MongoDB conectat"))
   .catch((err) => {
     console.error("❌ MongoDB error:", err.message);
-    if (err.message.includes("authentication failed")) {
-      console.log("🔍 Verifică:");
-      console.log("1. Username-ul și parola din connection string");
-      console.log("2. Dacă parola conține caractere speciale");
-      console.log("3. Dacă userul are permisiuni pentru database");
-    }
   });
 
 /* === Schema & Model === */
@@ -66,7 +63,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-/* === Spotify Token (Auth Code flow) === */
+/* === Spotify Token === */
 app.post("/get-token", async (req, res) => {
   const { code, redirect_uri } = req.body;
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
@@ -82,6 +79,7 @@ app.post("/get-token", async (req, res) => {
     params.append("grant_type", "authorization_code");
     params.append("code", code);
     params.append("redirect_uri", redirect_uri);
+
     const headers = {
       Authorization:
         "Basic " +
@@ -92,6 +90,7 @@ app.post("/get-token", async (req, res) => {
         ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
     };
+
     const response = await axios.post(
       "https://accounts.spotify.com/api/token",
       params.toString(),
@@ -104,7 +103,7 @@ app.post("/get-token", async (req, res) => {
   }
 });
 
-/* === Save Order (upsert) === */
+/* === Save Order === */
 app.post("/saveOrder", async (req, res) => {
   try {
     const { spotifyUserId, order } = req.body;
@@ -149,7 +148,7 @@ app.get("/playlist", async (req, res) => {
       });
     }
     const response = await axios.get(
-      `https://api.spotify.com/v1/playlists/$${process.env.PLAYLIST_ID}/tracks`,
+      `https://api.spotify.com/v1/playlists/${process.env.PLAYLIST_ID}/tracks`,
       {
         headers: {
           Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN}`,
