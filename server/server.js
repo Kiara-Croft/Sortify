@@ -46,50 +46,6 @@ mongoose
     }
   });
 
-/* === Funcție proxy pentru backend cu multiple opțiuni === */
-const fetchBackend = async (url, options = {}) => {
-  try {
-    console.log("🔗 Încerc apel direct către backend:", url);
-
-    // Folosim axios în loc de fetch deoarece suntem în Node.js
-    const response = await axios({
-      url,
-      method: options.method || "GET",
-      data: options.body || options.data,
-      headers: {
-        ...options.headers,
-        "Content-Type": "application/json",
-      },
-    });
-
-    console.log("✅ Apel direct reușit!");
-    return response;
-  } catch (error) {
-    console.error("❌ Eroare la apelul backend-ului:", error.message);
-
-    // Încercă o alternativă folosind un proxy CORS (doar pentru frontend, dar păstrăm logica)
-    try {
-      console.log("🔄 Încerc cu proxy CORS...");
-      const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-      const response = await axios({
-        url: proxyUrl,
-        method: options.method || "GET",
-        data: options.body || options.data,
-        headers: {
-          ...options.headers,
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("✅ Apel cu proxy reușit!");
-      return response;
-    } catch (proxyError) {
-      console.error("❌ Eroare și cu proxy:", proxyError.message);
-      throw error; // Aruncă eroarea originală
-    }
-  }
-};
-
 /* === Schema & Model === */
 const orderSchema = new mongoose.Schema(
   {
@@ -136,17 +92,11 @@ app.post("/get-token", async (req, res) => {
         ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
     };
-
-    // Folosim fetchBackend în loc de axios direct
-    const response = await fetchBackend(
+    const response = await axios.post(
       "https://accounts.spotify.com/api/token",
-      {
-        method: "POST",
-        data: params.toString(),
-        headers,
-      }
+      params.toString(),
+      { headers }
     );
-
     res.json(response.data);
   } catch (err) {
     console.error("Spotify token error:", err.response?.data || err.message);
@@ -198,17 +148,14 @@ app.get("/playlist", async (req, res) => {
         error: "Lipsește SPOTIFY_ACCESS_TOKEN sau PLAYLIST_ID din .env",
       });
     }
-
-    // Folosim fetchBackend în loc de axios direct
-    const response = await fetchBackend(
-      `https://api.spotify.com/v1/playlists/${process.env.PLAYLIST_ID}/tracks`,
+    const response = await axios.get(
+      `https://api.spotify.com/v1/playlists/$${process.env.PLAYLIST_ID}/tracks`,
       {
         headers: {
           Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN}`,
         },
       }
     );
-
     const data = response.data.items.map((item) => ({
       artist: item.track.artists[0].name,
       song: item.track.name,
