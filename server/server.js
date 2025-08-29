@@ -1,13 +1,11 @@
-// server/server.js
 require("dotenv").config();
 const express = require("express");
-const axios = require("axios");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
 const app = express();
 
-/* === CORS === */
+// Enable CORS for all routes
 app.use(
   cors({
     origin: ["https://melody-lab.netlify.app", "http://localhost:8888"],
@@ -16,6 +14,9 @@ app.use(
     credentials: true,
   })
 );
+
+// Handle preflight requests
+app.options("*", cors());
 
 // Body parsers
 app.use(express.json({ limit: "2mb" }));
@@ -66,65 +67,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-/* === Spotify Token (Auth Code flow) === */
-app.post("/get-token", async (req, res) => {
-  const { code, redirect_uri } = req.body;
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    return res
-      .status(500)
-      .json({ error: "Lipsesc SPOTIFY_CLIENT_ID/SECRET în environment" });
-  }
-  if (!code || !redirect_uri) {
-    return res.status(400).json({ error: "Lipsesc code sau redirect_uri" });
-  }
-  try {
-    const params = new URLSearchParams();
-    params.append("grant_type", "authorization_code");
-    params.append("code", code);
-    params.append("redirect_uri", redirect_uri);
-    const headers = {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.SPOTIFY_CLIENT_ID +
-            ":" +
-            process.env.SPOTIFY_CLIENT_SECRET
-        ).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded",
-    };
-    const response = await axios.post(
-      "https://accounts.spotify.com/api/token",
-      params.toString(),
-      { headers }
-    );
-    res.json(response.data);
-  } catch (err) {
-    console.error("Spotify token error:", err.response?.data || err.message);
-    res.status(400).json({ error: "Nu s-a putut obține token-ul" });
-  }
-});
-
-/* === Save Order (upsert) === */
-app.post("/saveOrder", async (req, res) => {
-  try {
-    const { spotifyUserId, order } = req.body;
-    if (!spotifyUserId || !order || typeof order !== "object") {
-      return res
-        .status(400)
-        .json({ error: "Missing sau invalid spotifyUserId/order" });
-    }
-    const result = await Order.findOneAndUpdate(
-      { spotifyUserId },
-      { $set: { order } },
-      { new: true, upsert: true }
-    );
-    res.json({ success: true, doc: result });
-  } catch (err) {
-    console.error("Error saving order:", err.message);
-    res.status(500).json({ error: "Eroare la salvarea ordinii" });
-  }
-});
-
 /* === Get Order === */
 app.get("/getOrder/:spotifyUserId", async (req, res) => {
   try {
@@ -140,31 +82,22 @@ app.get("/getOrder/:spotifyUserId", async (req, res) => {
   }
 });
 
-/* === Get Playlist Tracks === */
-app.get("/playlist", async (req, res) => {
-  try {
-    if (!process.env.SPOTIFY_ACCESS_TOKEN || !process.env.PLAYLIST_ID) {
-      return res.status(500).json({
-        error: "Lipsește SPOTIFY_ACCESS_TOKEN sau PLAYLIST_ID din .env",
-      });
-    }
-    const response = await axios.get(
-      `https://api.spotify.com/v1/playlists/$${process.env.PLAYLIST_ID}/tracks`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN}`,
-        },
-      }
-    );
-    const data = response.data.items.map((item) => ({
-      artist: item.track.artists[0].name,
-      song: item.track.name,
-    }));
-    res.json(data);
-  } catch (err) {
-    console.error("Spotify playlist error:", err.response?.data || err.message);
-    res.status(500).json({ error: "Nu s-a putut obține playlist-ul" });
-  }
+// Error handling middleware
+app.use((err, req, res, next) => {
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://melody-lab.netlify.app"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS, PUT, DELETE"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With"
+  );
+  console.error("Server error:", err.message);
+  res.status(500).json({ error: "Internal server error" });
 });
 
 const PORT = process.env.PORT || 8888;
