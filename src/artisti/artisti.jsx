@@ -23,40 +23,8 @@ const reorder = (list, startIndex, endIndex) => {
 
 // Funcție proxy pentru backend cu multiple opțiuni
 const fetchBackend = async (url, options = {}) => {
-  const proxyUrls = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    `https://proxy.cors.sh/${url}`,
-    `https://cors-anywhere.herokuapp.com/${url}`,
-  ];
-
-  for (const proxyUrl of proxyUrls) {
-    try {
-      console.log("🔗 Încerc proxy:", proxyUrl);
-      const response = await fetch(proxyUrl, {
-        ...options,
-        headers: {
-          ...options.headers,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.ok) {
-        console.log("✅ Proxy reușit:", proxyUrl);
-        return response;
-      }
-    } catch (error) {
-      console.log("❌ Proxy eșuat:", proxyUrl, error.message);
-      continue;
-    }
-  }
-
-  throw new Error("Toate proxy-urile au eșuat");
-};
-
-// Funcție proxy pentru Spotify
-const fetchWithCorsProxy = async (url, options = {}) => {
   try {
+    console.log("🔗 Încerc apel direct către backend:", url);
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -65,20 +33,30 @@ const fetchWithCorsProxy = async (url, options = {}) => {
       },
     });
 
-    if (response.ok) return response;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Eroare HTTP: ${response.status} - ${errorText}`);
+    }
 
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    const proxyResponse = await fetch(proxyUrl, {
-      ...options,
-      headers: {
-        ...options.headers,
-        "Content-Type": "application/json",
-      },
-    });
-
-    return proxyResponse;
+    console.log("✅ Apel direct reușit!");
+    return response;
   } catch (error) {
-    console.error("Eroare la fetch:", error);
+    console.error("❌ Eroare la fetch-ul backend-ului:", error.message);
+    throw error;
+  }
+};
+
+// Funcție pentru a apela direct API-ul Spotify
+const fetchWithCorsProxy = async (url, options = {}) => {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Eroare HTTP: ${response.status} - ${errorText}`);
+    }
+    return response;
+  } catch (error) {
+    console.error("Eroare la fetch-ul Spotify:", error);
     throw error;
   }
 };
@@ -114,7 +92,6 @@ export function Artisti() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
       if (response.ok) {
         const userData = await response.json();
         localStorage.setItem("spotifyUserId", userData.id);
@@ -130,24 +107,19 @@ export function Artisti() {
   useEffect(() => {
     const hash = window.location.hash;
     let token = localStorage.getItem("spotifyAccessToken");
-
     if (!token && hash) {
       token = hash
         .substring(1)
         .split("&")
         .find((elem) => elem.startsWith("access_token"))
         .split("=")[1];
-
       if (token) {
         localStorage.setItem("spotifyAccessToken", token);
         setAccessToken(token);
         window.location.hash = "";
-
-        // Obține user ID după login
         fetchUserProfile(token);
       }
     }
-
     if (!token) {
       navigate("/");
     } else if (!accessToken) {
@@ -170,11 +142,9 @@ export function Artisti() {
         const res = await fetchBackend(
           `https://backend-tau.onrender.com/getOrder/${spotifyUserId}`
         );
-
         if (res.ok) {
           const savedOrder = await res.json();
           console.log("✅ Ordinea salvată încărcată:", savedOrder);
-
           if (sortedTracks) {
             applySavedOrder(savedOrder);
           }
@@ -190,16 +160,13 @@ export function Artisti() {
   const applySavedOrder = (savedOrder) => {
     if (sortedTracks && savedOrder) {
       const newSorted = { ...sortedTracks };
-
       Object.keys(savedOrder).forEach((category) => {
         if (newSorted[category] && Array.isArray(savedOrder[category])) {
           const orderedArtists = [];
           const artistMap = new Map();
-
           newSorted[category].forEach((artist) => {
             artistMap.set(artist.artist.id, artist);
           });
-
           savedOrder[category].forEach((artistId) => {
             const artist = artistMap.get(artistId);
             if (artist) {
@@ -207,19 +174,17 @@ export function Artisti() {
               artistMap.delete(artistId);
             }
           });
-
           orderedArtists.push(...artistMap.values());
           newSorted[category] = orderedArtists;
         }
       });
-
       setSortedTracks(newSorted);
       console.log("✅ Ordine aplicată cu succes!");
     }
   };
 
   const handleLogin = () => {
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=$${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(
       SPOTIFY_REDIRECT_URI
     )}&scope=${SPOTIFY_SCOPES}&response_type=token&show_dialog=true`;
     window.location.href = authUrl;
@@ -227,28 +192,24 @@ export function Artisti() {
 
   const fetchAllPlaylistTracks = async (playlistId) => {
     let allTracks = [];
-    let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
+    let nextUrl = `https://api.spotify.com/v1/playlists/$${playlistId}/tracks?limit=50`;
     let fetched = 0;
     let total = 0;
-
     const initialResponse = await fetchWithCorsProxy(
-      `https://api.spotify.com/v1/playlists/${playlistId}`,
+      `https://api.spotify.com/v1/playlists/$${playlistId}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
-
     if (initialResponse.ok) {
       const playlistData = await initialResponse.json();
       total = playlistData.tracks.total;
       setTotalTracks(total);
     }
-
     while (nextUrl) {
       const response = await fetchWithCorsProxy(nextUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem("spotifyAccessToken");
@@ -259,29 +220,24 @@ export function Artisti() {
         }
         throw new Error("Failed to fetch playlist tracks");
       }
-
       const data = await response.json();
       allTracks = [...allTracks, ...data.items];
       fetched += data.items.length;
-
       setProgress(Math.min(100, Math.round((fetched / total) * 100)));
       nextUrl = data.next;
-
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-
     return allTracks;
   };
 
   const fetchArtistDetails = async (artistId) => {
     try {
       const response = await fetchWithCorsProxy(
-        `https://api.spotify.com/v1/artists/${artistId}`,
+        `https://api.spotify.com/v1/artists/$${artistId}`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
-
       if (response.ok) return await response.json();
     } catch (error) {
       console.error("Error fetching artist:", error);
@@ -356,11 +312,9 @@ export function Artisti() {
       handleLogin();
       return;
     }
-
     setIsLoading(true);
     setProgress(0);
     setTotalTracks(0);
-
     try {
       let spotifyUserId = localStorage.getItem("spotifyUserId");
       if (!spotifyUserId) {
@@ -370,7 +324,6 @@ export function Artisti() {
           localStorage.setItem("spotifyUserId", spotifyUserId);
         }
       }
-
       let savedOrder = {};
       if (spotifyUserId) {
         try {
@@ -387,13 +340,10 @@ export function Artisti() {
           console.error("Eroare la încărcarea ordinii:", error);
         }
       }
-
       const playlistId = "3aUY5hCQoliumlMGmFB3E4";
       const allTracks = await fetchAllPlaylistTracks(playlistId);
-
       if (allTracks.length === 0)
         throw new Error("Nu s-au putut obține melodiile din playlist");
-
       const sorted = {
         female: {},
         male: {},
@@ -403,63 +353,49 @@ export function Artisti() {
         soundtrack: {},
         unsorted: {},
       };
-
       const artistCache = {};
       const artistTrackCount = {};
-
       allTracks.forEach((item) => {
         if (item.track && item.track.artists && item.track.artists.length > 0) {
           const artistId = item.track.artists[0].id;
           artistTrackCount[artistId] = (artistTrackCount[artistId] || 0) + 1;
         }
       });
-
       for (let i = 0; i < allTracks.length; i++) {
         const item = allTracks[i];
         setProgress(Math.round((i / allTracks.length) * 100));
-
         if (
           !item.track ||
           !item.track.artists ||
           item.track.artists.length === 0
         )
           continue;
-
         const track = item.track;
         const artist = track.artists[0];
         const artistId = artist.id;
         const trackCount = artistTrackCount[artistId] || 0;
-
         if (!artistCache[artistId]) {
           artistCache[artistId] = await fetchArtistDetails(artistId);
           await new Promise((resolve) => setTimeout(resolve, 20));
         }
-
         const artistDetails = artistCache[artistId];
         const genres = artistDetails ? artistDetails.genres : [];
-
         let category = determineArtistCategory(artist.name, genres, trackCount);
-
         if (!sorted[category][artistId])
           sorted[category][artistId] = { artist: artist, tracks: [] };
-
         sorted[category][artistId].tracks.push(track);
       }
-
       Object.keys(sorted).forEach((category) => {
         sorted[category] = Object.values(sorted[category]);
       });
-
       if (Object.keys(savedOrder).length > 0) {
         Object.keys(savedOrder).forEach((category) => {
           if (sorted[category] && Array.isArray(savedOrder[category])) {
             const orderedArtists = [];
             const artistMap = new Map();
-
             sorted[category].forEach((artist) => {
               artistMap.set(artist.artist.id, artist);
             });
-
             savedOrder[category].forEach((artistId) => {
               const artist = artistMap.get(artistId);
               if (artist) {
@@ -467,13 +403,11 @@ export function Artisti() {
                 artistMap.delete(artistId);
               }
             });
-
             orderedArtists.push(...artistMap.values());
             sorted[category] = orderedArtists;
           }
         });
       }
-
       console.log(
         "🎵 Artisti procesați:",
         Object.keys(sorted).map((cat) => ({
@@ -481,7 +415,6 @@ export function Artisti() {
           count: sorted[cat].length,
         }))
       );
-
       setSortedTracks(sorted);
       setProgress(100);
     } catch (error) {
@@ -495,11 +428,9 @@ export function Artisti() {
   // --- DRAG & DROP ---
   const handleDragEnd = async (result) => {
     if (!result.destination) return;
-
     const sourceCategory = result.source.droppableId;
     const destCategory = result.destination.droppableId;
     const newSorted = { ...sortedTracks };
-
     if (sourceCategory === destCategory) {
       newSorted[sourceCategory] = reorder(
         sortedTracks[sourceCategory],
@@ -513,14 +444,11 @@ export function Artisti() {
       );
       newSorted[destCategory].splice(result.destination.index, 0, movedArtist);
     }
-
     setSortedTracks(newSorted);
-
     const orderToSave = {};
     Object.keys(newSorted).forEach((cat) => {
       orderToSave[cat] = newSorted[cat].map((a) => a.artist.id);
     });
-
     const spotifyUserId = localStorage.getItem("spotifyUserId");
     if (spotifyUserId) {
       try {
@@ -533,7 +461,6 @@ export function Artisti() {
             body: JSON.stringify({ spotifyUserId, order: orderToSave }),
           }
         );
-
         if (response.ok) {
           console.log("✅ Ordine salvată cu succes în backend!");
         } else {
@@ -552,14 +479,12 @@ export function Artisti() {
     const key = `${category}-${artistId}`;
     setExpandedArtist(expandedArtist === key ? null : key);
   };
-
   const handleLogout = () => {
     localStorage.removeItem("spotifyAccessToken");
     localStorage.removeItem("spotifyUserId");
     setAccessToken("");
     setSortedTracks(null);
   };
-
   const handleNavigateToTabel = () => {
     navigate("/tabel");
   };
@@ -571,7 +496,6 @@ export function Artisti() {
         <div className={styles.logoContainer}>
           <img src="/logo.png" alt="Spotify Logo" className={styles.logo} />
         </div>
-
         <div className={styles.headerButtons}>
           <button
             className={styles.spotifyButton}
@@ -585,9 +509,7 @@ export function Artisti() {
           </button>
         </div>
       </header>
-
       <h2 className={styles.mainHeading}>ARTISTI TAI INDRAGITI</h2>
-
       <div className={styles.buttonContainer}>
         <button
           className={styles.navigationButton}
@@ -596,7 +518,6 @@ export function Artisti() {
           Vezi Tabelul
         </button>
       </div>
-
       {isLoading && (
         <div className={styles.loading}>
           <div className={styles.progressBar}>
@@ -609,13 +530,11 @@ export function Artisti() {
           <p>Procesez {totalTracks} piese...</p>
         </div>
       )}
-
       {!isLoading && !sortedTracks && (
         <div className={styles.placeholder}>
           <p>Apasă "Încarcă Playlist" pentru a vedere melodiile sortate</p>
         </div>
       )}
-
       {sortedTracks && (
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className={styles.sortedContainer}>
@@ -627,7 +546,6 @@ export function Artisti() {
                     <h3 className={styles.categoryTitle}>
                       {categories[category]} ({sortedTracks[category].length})
                     </h3>
-
                     <Droppable droppableId={category}>
                       {(provided) => (
                         <div
@@ -668,7 +586,6 @@ export function Artisti() {
                                         : "▼"}
                                     </span>
                                   </div>
-
                                   {expandedArtist ===
                                     `${category}-${artistData.artist.id}` && (
                                     <div className={styles.tracksList}>

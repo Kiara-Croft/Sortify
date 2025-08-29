@@ -26,12 +26,10 @@ const mongoURI = process.env.MONGO_URI;
 if (!mongoURI) {
   console.error("❌ MONGO_URI lipsă din environment!");
 } else {
-  // Debug: afișează URI-ul (fără parolă pentru securitate)
   const safeURI = mongoURI.replace(/:[^:]*@/, ":****@");
   console.log("⏳ Încerc conectarea la:", safeURI);
 }
 
-// REVENIM LA SETĂRILE ORIGINALE care funcționau
 mongoose
   .connect(mongoURI, {
     useNewUrlParser: true,
@@ -40,8 +38,6 @@ mongoose
   .then(() => console.log("✅ MongoDB conectat"))
   .catch((err) => {
     console.error("❌ MongoDB error:", err.message);
-
-    // Debug detaliat pentru probleme de autentificare
     if (err.message.includes("authentication failed")) {
       console.log("🔍 Verifică:");
       console.log("1. Username-ul și parola din connection string");
@@ -73,7 +69,6 @@ app.get("/health", (req, res) => {
 /* === Spotify Token (Auth Code flow) === */
 app.post("/get-token", async (req, res) => {
   const { code, redirect_uri } = req.body;
-
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
     return res
       .status(500)
@@ -82,13 +77,11 @@ app.post("/get-token", async (req, res) => {
   if (!code || !redirect_uri) {
     return res.status(400).json({ error: "Lipsesc code sau redirect_uri" });
   }
-
   try {
     const params = new URLSearchParams();
     params.append("grant_type", "authorization_code");
     params.append("code", code);
     params.append("redirect_uri", redirect_uri);
-
     const headers = {
       Authorization:
         "Basic " +
@@ -99,13 +92,11 @@ app.post("/get-token", async (req, res) => {
         ).toString("base64"),
       "Content-Type": "application/x-www-form-urlencoded",
     };
-
     const response = await axios.post(
       "https://accounts.spotify.com/api/token",
       params.toString(),
       { headers }
     );
-
     res.json(response.data);
   } catch (err) {
     console.error("Spotify token error:", err.response?.data || err.message);
@@ -122,14 +113,11 @@ app.post("/saveOrder", async (req, res) => {
         .status(400)
         .json({ error: "Missing sau invalid spotifyUserId/order" });
     }
-
-    // Upsert: dacă există -> update, altfel -> insert
     const result = await Order.findOneAndUpdate(
       { spotifyUserId },
       { $set: { order } },
       { new: true, upsert: true }
     );
-
     res.json({ success: true, doc: result });
   } catch (err) {
     console.error("Error saving order:", err.message);
@@ -144,9 +132,8 @@ app.get("/getOrder/:spotifyUserId", async (req, res) => {
     if (!spotifyUserId) {
       return res.status(400).json({ error: "Lipsește spotifyUserId" });
     }
-
     const doc = await Order.findOne({ spotifyUserId });
-    res.json(doc ? doc.order : {}); // dacă nu există, întoarcem obiect gol
+    res.json(doc ? doc.order : {});
   } catch (err) {
     console.error("Error fetching order:", err.message);
     res.status(500).json({ error: "Eroare la încărcarea ordinii" });
@@ -161,21 +148,18 @@ app.get("/playlist", async (req, res) => {
         error: "Lipsește SPOTIFY_ACCESS_TOKEN sau PLAYLIST_ID din .env",
       });
     }
-
     const response = await axios.get(
-      `https://api.spotify.com/v1/playlists/${process.env.PLAYLIST_ID}/tracks`,
+      `https://api.spotify.com/v1/playlists/$${process.env.PLAYLIST_ID}/tracks`,
       {
         headers: {
           Authorization: `Bearer ${process.env.SPOTIFY_ACCESS_TOKEN}`,
         },
       }
     );
-
     const data = response.data.items.map((item) => ({
       artist: item.track.artists[0].name,
       song: item.track.name,
     }));
-
     res.json(data);
   } catch (err) {
     console.error("Spotify playlist error:", err.response?.data || err.message);
